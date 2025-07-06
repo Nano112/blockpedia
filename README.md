@@ -4,7 +4,7 @@
 [![Documentation](https://docs.rs/blockpedia/badge.svg)](https://docs.rs/blockpedia)
 [![Build Status](https://github.com/Nano112/blockpedia/workflows/CI/badge.svg)](https://github.com/Nano112/blockpedia/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.82%2B-orange)](https://www.rust-lang.org)
 
 A comprehensive Rust library for Minecraft block data with advanced color analysis and gradient palette generation.
 
@@ -49,7 +49,7 @@ Blockpedia provides programmatic access to Minecraft block information, includin
 ## 🚀 Installation
 
 ### Prerequisites
-- Rust 1.70 or later
+- Rust 1.82 or later
 - Git (for cloning the repository)
 
 ### From Source
