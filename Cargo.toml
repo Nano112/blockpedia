@@ -1,0 +1,98 @@
+[package]
+name = "blockpedia"
+version = "0.1.0"
+edition = "2021"
+authors = ["Harrison <harrison@example.com>"]
+description = "A comprehensive Rust library for Minecraft block data with advanced color analysis and palette generation"
+readme = "README.md"
+homepage = "https://github.com/Nano112/blockpedia"
+repository = "https://github.com/Nano112/blockpedia"
+license = "MIT"
+keywords = ["minecraft", "blocks", "color", "palette", "gamedev"]
+categories = ["game-development", "graphics", "data-structures"]
+exclude = [
+    "web/*",
+    "assets/textures/*",
+    ".github/*",
+    "examples/*",
+    "tests/*"
+]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "blockpedia-cli"
+path = "src/bin/cli.rs"
+required-features = ["tui"]
+
+[[bin]]
+name = "list-sources"
+path = "src/bin/list-sources.rs"
+
+[[bin]]
+name = "download-textures"
+path = "src/bin/download-textures.rs"
+required-features = ["network"]
+
+[[bin]]
+name = "modern-cli"
+path = "src/bin/modern-cli.rs"
+required-features = ["tui"]
+
+[[bin]]
+name = "missing-colors"
+path = "src/bin/missing-colors.rs"
+
+[[bin]]
+name = "test-cli-colors"
+path = "src/bin/test-cli-colors.rs"
+
+[dependencies]
+# Core library dependencies
+phf = { version = "0.11", features = ["macros"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+thiserror = "1.0"
+# Color and image processing
+image = "0.24"
+palette = "0.7"
+# TUI dependencies (optional)
+ratatui = { version = "0.25", optional = true }
+crossterm = { version = "0.27", optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# CLI utilities need network access for downloading textures
+tokio = { version = "1.0", features = ["rt", "rt-multi-thread", "macros", "time"], optional = true }
+reqwest = { version = "0.12", features = ["json"], optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# WASM-compatible tokio features
+tokio = { version = "1.0", features = ["rt", "macros", "time"] }
+# WASM-specific dependencies
+wasm-bindgen = { version = "0.2", optional = true }
+web-sys = { version = "0.3", features = ["console"], optional = true }
+js-sys = { version = "0.3", optional = true }
+console_error_panic_hook = { version = "0.1", optional = true }
+wee_alloc = { version = "0.4", optional = true }
+serde-wasm-bindgen = { version = "0.6", optional = true }
+
+[build-dependencies]
+phf_codegen = "0.11"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.12", features = ["blocking", "json"] }
+anyhow = "1.0"
+tokio = { version = "1.0", features = ["rt", "rt-multi-thread"] }
+image = "0.24"
+
+[features]
+default = ["tui"]
+tui = ["ratatui", "crossterm"]
+network = ["tokio", "reqwest"]
+wasm = ["wasm-bindgen", "web-sys", "js-sys", "console_error_panic_hook", "wee_alloc", "serde-wasm-bindgen"]
+
+[dev-dependencies]
+proptest = "1.4"
+trybuild = "1.0"

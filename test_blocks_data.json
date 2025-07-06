@@ -1,0 +1,184 @@
+{
+  "blocks": {
+    "minecraft:stone": {
+      "properties": {},
+      "default_state": {}
+    },
+    "minecraft:dirt": {
+      "properties": {},
+      "default_state": {}
+    },
+    "minecraft:grass_block": {
+      "properties": {
+        "snowy": ["true", "false"]
+      },
+      "default_state": {
+        "snowy": "false"
+      }
+    },
+    "minecraft:oak_log": {
+      "properties": {
+        "axis": ["x", "y", "z"]
+      },
+      "default_state": {
+        "axis": "y"
+      }
+    },
+    "minecraft:oak_leaves": {
+      "properties": {
+        "distance": ["1", "2", "3", "4", "5", "6", "7"],
+        "persistent": ["true", "false"]
+      },
+      "default_state": {
+        "distance": "7",
+        "persistent": "false"
+      }
+    },
+    "minecraft:oak_planks": {
+      "properties": {},
+      "default_state": {}
+    },
+    "minecraft:repeater": {
+      "properties": {
+        "delay": ["1", "2", "3", "4"],
+        "facing": ["north", "south", "east", "west"],
+        "locked": ["true", "false"],
+        "powered": ["true", "false"]
+      },
+      "default_state": {
+        "delay": "1",
+        "facing": "north",
+        "locked": "false",
+        "powered": "false"
+      }
+    },
+    "minecraft:comparator": {
+      "properties": {
+        "facing": ["north", "south", "east", "west"],
+        "mode": ["compare", "subtract"],
+        "powered": ["true", "false"]
+      },
+      "default_state": {
+        "facing": "north",
+        "mode": "compare",
+        "powered": "false"
+      }
+    },
+    "minecraft:redstone_wire": {
+      "properties": {
+        "east": ["up", "side", "none"],
+        "north": ["up", "side", "none"],
+        "power": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"],
+        "south": ["up", "side", "none"],
+        "west": ["up", "side", "none"]
+      },
+      "default_state": {
+        "east": "none",
+        "north": "none",
+        "power": "0",
+        "south": "none",
+        "west": "none"
+      }
+    },
+    "minecraft:oak_stairs": {
+      "properties": {
+        "facing": ["north", "south", "east", "west"],
+        "half": ["top", "bottom"],
+        "shape": ["straight", "inner_left", "inner_right", "outer_left", "outer_right"],
+        "waterlogged": ["true", "false"]
+      },
+      "default_state": {
+        "facing": "north",
+        "half": "bottom",
+        "shape": "straight",
+        "waterlogged": "false"
+      }
+    },
+    "minecraft:oak_slab": {
+      "properties": {
+        "type": ["top", "bottom", "double"],
+        "waterlogged": ["true", "false"]
+      },
+      "default_state": {
+        "type": "bottom",
+        "waterlogged": "false"
+      }
+    },
+    "minecraft:oak_fence": {
+      "properties": {
+        "east": ["true", "false"],
+        "north": ["true", "false"],
+        "south": ["true", "false"],
+        "waterlogged": ["true", "false"],
+        "west": ["true", "false"]
+      },
+      "default_state": {
+        "east": "false",
+        "north": "false",
+        "south": "false",
+        "waterlogged": "false",
+        "west": "false"
+      }
+    },
+    "minecraft:oak_door": {
+      "properties": {
+        "facing": ["north", "south", "east", "west"],
+        "half": ["upper", "lower"],
+        "hinge": ["left", "right"],
+        "open": ["true", "false"],
+        "powered": ["true", "false"]
+      },
+      "default_state": {
+        "facing": "north",
+        "half": "lower",
+        "hinge": "left",
+        "open": "false",
+        "powered": "false"
+      }
+    },
+    "minecraft:water": {
+      "properties": {
+        "level": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"]
+      },
+      "default_state": {
+        "level": "0"
+      }
+    },
+    "minecraft:lava": {
+      "properties": {
+        "level": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"]
+      },
+      "default_state": {
+        "level": "0"
+      }
+    },
+    "minecraft:cobblestone": {
+      "properties": {},
+      "default_state": {}
+    },
+    "minecraft:bedrock": {
+      "properties": {},
+      "default_state": {}
+    },
+    "minecraft:sand": {
+      "properties": {},
+      "default_state": {}
+    },
+    "minecraft:gravel": {
+      "properties": {},
+      "default_state": {}
+    },
+    "minecraft:gold_ore": {
+      "properties": {},
+      "default_state": {}
+    },
+    "minecraft:iron_ore": {
+      "properties": {},
+      "default_state": {}
+    },
+    "minecraft:diamond_ore": {
+      "properties": {},
+      "default_state": {}
+    }
+  }
+}
