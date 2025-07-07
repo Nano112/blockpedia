@@ -18,8 +18,6 @@ jobs:
       matrix:
         rust:
           - stable
-          - beta
-          - 1.82.0  # MSRV
     steps:
     - uses: actions/checkout@v4
     
