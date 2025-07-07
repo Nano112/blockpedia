@@ -28,7 +28,11 @@ impl TextureMapping {
         TextureCoverageStats {
             total_blocks,
             blocks_with_textures: self.mappings.len(),
-            unique_textures: self.mappings.values().collect::<std::collections::HashSet<_>>().len(),
+            unique_textures: self
+                .mappings
+                .values()
+                .collect::<std::collections::HashSet<_>>()
+                .len(),
             coverage_percentage: (self.mappings.len() as f32 / total_blocks as f32) * 100.0,
         }
     }

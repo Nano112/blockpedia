@@ -1,20 +1,22 @@
+use blockpedia::{color::ExtendedColorData, query_builder::*};
 use crossterm::event::{self, Event as CEvent, KeyCode};
-use std::{error::Error, io};
 use ratatui::backend::CrosstermBackend;
-use ratatui::Terminal;
-use ratatui::widgets::{
-    Block, Borders, List, ListItem, Paragraph, Tabs, Clear
-};
-use ratatui::layout::{Layout, Constraint, Direction, Alignment, Rect};
-use ratatui::style::{Color, Style, Modifier};
+use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Line;
-use blockpedia::{query_builder::*, color::ExtendedColorData};
+use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Tabs};
+use ratatui::Terminal;
+use std::{error::Error, io};
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Initialize terminal
     crossterm::terminal::enable_raw_mode()?;
     let mut stdout = io::stdout();
-    crossterm::execute!(stdout, crossterm::terminal::EnterAlternateScreen, crossterm::cursor::Hide)?;
+    crossterm::execute!(
+        stdout,
+        crossterm::terminal::EnterAlternateScreen,
+        crossterm::cursor::Hide
+    )?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -40,7 +42,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn run_app<B: ratatui::backend::Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<()> {
+fn run_app<B: ratatui::backend::Backend>(
+    terminal: &mut Terminal<B>,
+    app: &mut App,
+) -> io::Result<()> {
     loop {
         terminal.draw(|f| ui(f, app))?;
 
@@ -97,13 +102,17 @@ fn ui(f: &mut ratatui::Frame, app: &App) {
         .block(Block::default().borders(Borders::ALL))
         .select(app.current_tab as usize)
         .style(Style::default().fg(Color::White))
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD).bg(Color::Blue));
-    
+        .highlight_style(
+            Style::default()
+                .add_modifier(Modifier::BOLD)
+                .bg(Color::Blue),
+        );
+
     let inner_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Length(3), Constraint::Min(0)])
         .split(chunks[1]);
-    
+
     f.render_widget(tabs, inner_chunks[0]);
 
     match app.current_tab {
@@ -115,8 +124,12 @@ fn ui(f: &mut ratatui::Frame, app: &App) {
 
     // Status bar
     let help_text = match app.current_tab {
-        Tab::QueryBuilder => "[Enter] Execute query | [r] Reset | [s] Save query | [Tab] Switch tabs | [q] Quit",
-        Tab::Results => "[↑/↓] Navigate | [Enter] Details | [e] Export | [Tab] Switch tabs | [q] Quit",
+        Tab::QueryBuilder => {
+            "[Enter] Execute query | [r] Reset | [s] Save query | [Tab] Switch tabs | [q] Quit"
+        }
+        Tab::Results => {
+            "[↑/↓] Navigate | [Enter] Details | [e] Export | [Tab] Switch tabs | [q] Quit"
+        }
         Tab::Examples => "[↑/↓] Navigate | [Enter] Load example | [Tab] Switch tabs | [q] Quit",
         Tab::Help => "[Tab] Switch tabs | [q] Quit",
     };
@@ -148,7 +161,7 @@ fn render_query_builder_tab(f: &mut ratatui::Frame, app: &App, area: Rect) {
         "🔍 Query Operations:",
         "",
         "[1] 🏗️  Filter: Only solid blocks",
-        "[2] 🌱 Filter: Survival obtainable only", 
+        "[2] 🌱 Filter: Survival obtainable only",
         "[3] 🎨 Filter: Blocks with color data",
         "[4] 🚫 Filter: Exclude transparent blocks",
         "[5] 🔧 Filter: Exclude tile entities",
@@ -165,15 +178,26 @@ fn render_query_builder_tab(f: &mut ratatui::Frame, app: &App, area: Rect) {
 
     // Current query display
     let query_display = format_current_query(app);
-    let query_text: Vec<Line> = query_display.iter().map(|s| Line::from(s.clone())).collect();
+    let query_text: Vec<Line> = query_display
+        .iter()
+        .map(|s| Line::from(s.clone()))
+        .collect();
     let query_paragraph = Paragraph::new(query_text)
-        .block(Block::default().borders(Borders::ALL).title("Current Query"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Current Query"),
+        )
         .wrap(ratatui::widgets::Wrap { trim: true });
     f.render_widget(query_paragraph, left_chunks[1]);
 
     // Results preview
     let preview_text = if app.query_results.is_empty() {
-        vec!["No query executed yet.".to_string(), "".to_string(), "Build a query using operations 1-0, then press [Enter] to execute.".to_string()]
+        vec![
+            "No query executed yet.".to_string(),
+            "".to_string(),
+            "Build a query using operations 1-0, then press [Enter] to execute.".to_string(),
+        ]
     } else {
         let mut preview = vec![
             format!("Results: {} blocks found", app.query_results.len()),
@@ -209,10 +233,12 @@ fn render_query_builder_tab(f: &mut ratatui::Frame, app: &App, area: Rect) {
 
 fn render_results_tab(f: &mut ratatui::Frame, app: &App, area: Rect) {
     if app.query_results.is_empty() {
-        let empty_message = Paragraph::new("No results to display.\n\nGo to the Query Builder tab to create and execute a query.")
-            .style(Style::default().fg(Color::Yellow))
-            .alignment(Alignment::Center)
-            .block(Block::default().borders(Borders::ALL).title("Results"));
+        let empty_message = Paragraph::new(
+            "No results to display.\n\nGo to the Query Builder tab to create and execute a query.",
+        )
+        .style(Style::default().fg(Color::Yellow))
+        .alignment(Alignment::Center)
+        .block(Block::default().borders(Borders::ALL).title("Results"));
         f.render_widget(empty_message, area);
         return;
     }
@@ -223,7 +249,8 @@ fn render_results_tab(f: &mut ratatui::Frame, app: &App, area: Rect) {
         .split(area);
 
     // Results list
-    let items: Vec<ListItem> = app.query_results
+    let items: Vec<ListItem> = app
+        .query_results
         .iter()
         .enumerate()
         .map(|(i, block)| {
@@ -231,7 +258,7 @@ fn render_results_tab(f: &mut ratatui::Frame, app: &App, area: Rect) {
             if i == app.selected_result_index {
                 style = style.bg(Color::Blue).fg(Color::White);
             }
-            
+
             let mut indicators = Vec::new();
             if block.extras.color.is_some() {
                 indicators.push("🎨");
@@ -242,28 +269,29 @@ fn render_results_tab(f: &mut ratatui::Frame, app: &App, area: Rect) {
             if block.extras.mock_data.is_some() {
                 indicators.push("🔧");
             }
-            
+
             let indicator_text = if indicators.is_empty() {
                 String::new()
             } else {
                 format!(" {}", indicators.join(""))
             };
-            
+
             ListItem::new(format!("{}{}", block.id(), indicator_text)).style(style)
         })
         .collect();
 
     let results_list = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title(format!("Results ({} blocks)", app.query_results.len())))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(format!("Results ({} blocks)", app.query_results.len())),
+        )
         .highlight_style(Style::default().add_modifier(Modifier::BOLD));
     f.render_widget(results_list, chunks[0]);
 
     // Block details
     if let Some(selected_block) = app.get_selected_result() {
-        let mut details = vec![
-            format!("🆔 ID: {}", selected_block.id()),
-            "".to_string(),
-        ];
+        let mut details = vec![format!("🆔 ID: {}", selected_block.id()), "".to_string()];
 
         // Properties
         if selected_block.properties.is_empty() {
@@ -281,9 +309,14 @@ fn render_results_tab(f: &mut ratatui::Frame, app: &App, area: Rect) {
         if let Some(color) = &selected_block.extras.color {
             details.push("🎨 Color Data:".to_string());
             details.push(format!("   • RGB: {:?}", color.rgb));
-            details.push(format!("   • Hex: #{:02X}{:02X}{:02X}", color.rgb[0], color.rgb[1], color.rgb[2]));
-            details.push(format!("   • Oklab: [{:.2}, {:.2}, {:.2}]", 
-                color.oklab[0], color.oklab[1], color.oklab[2]));
+            details.push(format!(
+                "   • Hex: #{:02X}{:02X}{:02X}",
+                color.rgb[0], color.rgb[1], color.rgb[2]
+            ));
+            details.push(format!(
+                "   • Oklab: [{:.2}, {:.2}, {:.2}]",
+                color.oklab[0], color.oklab[1], color.oklab[2]
+            ));
         } else {
             details.push("🎨 Color Data: None".to_string());
         }
@@ -308,7 +341,11 @@ fn render_results_tab(f: &mut ratatui::Frame, app: &App, area: Rect) {
 
         let details_text: Vec<Line> = details.iter().map(|s| Line::from(s.clone())).collect();
         let details_paragraph = Paragraph::new(details_text)
-            .block(Block::default().borders(Borders::ALL).title("Block Details"))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Block Details"),
+            )
             .wrap(ratatui::widgets::Wrap { trim: true });
         f.render_widget(details_paragraph, chunks[1]);
     }
@@ -335,7 +372,11 @@ fn render_examples_tab(f: &mut ratatui::Frame, app: &App, area: Rect) {
         .collect();
 
     let examples_list = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title("Example Queries"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Example Queries"),
+        )
         .highlight_style(Style::default().add_modifier(Modifier::BOLD));
     f.render_widget(examples_list, chunks[0]);
 
@@ -360,7 +401,11 @@ fn render_examples_tab(f: &mut ratatui::Frame, app: &App, area: Rect) {
 
         let details_text: Vec<Line> = details.iter().map(|s| Line::from(s.clone())).collect();
         let details_paragraph = Paragraph::new(details_text)
-            .block(Block::default().borders(Borders::ALL).title("Example Details"))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Example Details"),
+            )
             .wrap(ratatui::widgets::Wrap { trim: true });
         f.render_widget(details_paragraph, chunks[1]);
     }
@@ -421,7 +466,11 @@ fn render_help_tab(f: &mut ratatui::Frame, _app: &App, area: Rect) {
 
     let help_text: Vec<Line> = help_content.iter().map(|s| Line::from(*s)).collect();
     let help_paragraph = Paragraph::new(help_text)
-        .block(Block::default().borders(Borders::ALL).title("Help & Documentation"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Help & Documentation"),
+        )
         .wrap(ratatui::widgets::Wrap { trim: true });
     f.render_widget(help_paragraph, area);
 }
@@ -485,36 +534,32 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
 
 fn handle_query_builder_input(key: crossterm::event::KeyEvent, app: &mut App) {
     match app.input_mode {
-        InputMode::Normal => {
-            match key.code {
-                KeyCode::Char('1') => app.add_solid_filter(),
-                KeyCode::Char('2') => app.add_survival_filter(),
-                KeyCode::Char('3') => app.add_color_filter(),
-                KeyCode::Char('4') => app.add_transparent_exclusion(),
-                KeyCode::Char('5') => app.add_tile_entity_exclusion(),
-                KeyCode::Char('6') => app.open_property_input_modal(),
-                KeyCode::Char('7') => app.open_color_input_modal(),
-                KeyCode::Char('8') => app.open_pattern_input_modal(),
-                KeyCode::Char('9') => app.open_limit_input_modal(),
-                KeyCode::Char('0') => app.open_gradient_config_modal(),
-                KeyCode::Enter => app.execute_query(),
-                KeyCode::Char('r') => app.reset_query(),
-                KeyCode::Char('s') => app.open_save_query_modal(),
-                _ => {}
+        InputMode::Normal => match key.code {
+            KeyCode::Char('1') => app.add_solid_filter(),
+            KeyCode::Char('2') => app.add_survival_filter(),
+            KeyCode::Char('3') => app.add_color_filter(),
+            KeyCode::Char('4') => app.add_transparent_exclusion(),
+            KeyCode::Char('5') => app.add_tile_entity_exclusion(),
+            KeyCode::Char('6') => app.open_property_input_modal(),
+            KeyCode::Char('7') => app.open_color_input_modal(),
+            KeyCode::Char('8') => app.open_pattern_input_modal(),
+            KeyCode::Char('9') => app.open_limit_input_modal(),
+            KeyCode::Char('0') => app.open_gradient_config_modal(),
+            KeyCode::Enter => app.execute_query(),
+            KeyCode::Char('r') => app.reset_query(),
+            KeyCode::Char('s') => app.open_save_query_modal(),
+            _ => {}
+        },
+        InputMode::Modal => match key.code {
+            KeyCode::Enter => app.confirm_modal_input(),
+            KeyCode::Backspace => {
+                app.input_buffer.pop();
             }
-        }
-        InputMode::Modal => {
-            match key.code {
-                KeyCode::Enter => app.confirm_modal_input(),
-                KeyCode::Backspace => {
-                    app.input_buffer.pop();
-                }
-                KeyCode::Char(c) => {
-                    app.input_buffer.push(c);
-                }
-                _ => {}
+            KeyCode::Char(c) => {
+                app.input_buffer.push(c);
             }
-        }
+            _ => {}
+        },
     }
 }
 
@@ -604,7 +649,9 @@ impl Default for App {
     fn default() -> App {
         App {
             current_tab: Tab::QueryBuilder,
-            current_query: QueryState { operations: Vec::new() },
+            current_query: QueryState {
+                operations: Vec::new(),
+            },
             query_results: Vec::new(),
             selected_result_index: 0,
             selected_example_index: 0,
@@ -637,7 +684,8 @@ impl App {
 
     fn next_result(&mut self) {
         if !self.query_results.is_empty() {
-            self.selected_result_index = (self.selected_result_index + 1) % self.query_results.len();
+            self.selected_result_index =
+                (self.selected_result_index + 1) % self.query_results.len();
         }
     }
 
@@ -675,23 +723,33 @@ impl App {
 
     // Query operations
     fn add_solid_filter(&mut self) {
-        self.current_query.operations.push(QueryOperation::OnlySolid);
+        self.current_query
+            .operations
+            .push(QueryOperation::OnlySolid);
     }
 
     fn add_survival_filter(&mut self) {
-        self.current_query.operations.push(QueryOperation::SurvivalOnly);
+        self.current_query
+            .operations
+            .push(QueryOperation::SurvivalOnly);
     }
 
     fn add_color_filter(&mut self) {
-        self.current_query.operations.push(QueryOperation::WithColor);
+        self.current_query
+            .operations
+            .push(QueryOperation::WithColor);
     }
 
     fn add_transparent_exclusion(&mut self) {
-        self.current_query.operations.push(QueryOperation::ExcludeTransparent);
+        self.current_query
+            .operations
+            .push(QueryOperation::ExcludeTransparent);
     }
 
     fn add_tile_entity_exclusion(&mut self) {
-        self.current_query.operations.push(QueryOperation::ExcludeTileEntities);
+        self.current_query
+            .operations
+            .push(QueryOperation::ExcludeTileEntities);
     }
 
     fn open_property_input_modal(&mut self) {
@@ -741,33 +799,43 @@ impl App {
             ModalType::PropertyInput => {
                 let parts: Vec<&str> = self.input_buffer.split(':').collect();
                 if parts.len() == 2 {
-                    self.current_query.operations.push(QueryOperation::PropertyFilter {
-                        property: parts[0].trim().to_string(),
-                        value: parts[1].trim().to_string(),
-                    });
+                    self.current_query
+                        .operations
+                        .push(QueryOperation::PropertyFilter {
+                            property: parts[0].trim().to_string(),
+                            value: parts[1].trim().to_string(),
+                        });
                 }
             }
             ModalType::ColorInput => {
                 if self.input_buffer.starts_with('#') && self.input_buffer.len() == 7 {
-                    self.current_query.operations.push(QueryOperation::ColorSimilarity {
-                        hex: self.input_buffer.clone(),
-                        tolerance: 30.0, // Default tolerance
-                    });
+                    self.current_query
+                        .operations
+                        .push(QueryOperation::ColorSimilarity {
+                            hex: self.input_buffer.clone(),
+                            tolerance: 30.0, // Default tolerance
+                        });
                 }
             }
             ModalType::PatternInput => {
                 if !self.input_buffer.is_empty() {
-                    self.current_query.operations.push(QueryOperation::PatternMatch(self.input_buffer.clone()));
+                    self.current_query
+                        .operations
+                        .push(QueryOperation::PatternMatch(self.input_buffer.clone()));
                 }
             }
             ModalType::LimitInput => {
                 if let Ok(limit) = self.input_buffer.parse::<usize>() {
-                    self.current_query.operations.push(QueryOperation::Limit(limit));
+                    self.current_query
+                        .operations
+                        .push(QueryOperation::Limit(limit));
                 }
             }
             ModalType::GradientConfig => {
                 if let Ok(steps) = self.input_buffer.parse::<usize>() {
-                    self.current_query.operations.push(QueryOperation::GenerateGradient { steps });
+                    self.current_query
+                        .operations
+                        .push(QueryOperation::GenerateGradient { steps });
                 }
             }
             ModalType::SaveQuery => {
@@ -807,7 +875,8 @@ impl App {
                     if let Ok(target_r) = u8::from_str_radix(&hex[1..3], 16) {
                         if let Ok(target_g) = u8::from_str_radix(&hex[3..5], 16) {
                             if let Ok(target_b) = u8::from_str_radix(&hex[5..7], 16) {
-                                let target_color = ExtendedColorData::from_rgb(target_r, target_g, target_b);
+                                let target_color =
+                                    ExtendedColorData::from_rgb(target_r, target_g, target_b);
                                 query = query.similar_to_color(target_color, *tolerance);
                             }
                         }
@@ -951,9 +1020,9 @@ fn get_example_queries() -> Vec<ExampleQuery> {
             name: "Red Blocks Search".to_string(),
             description: "Find blocks similar to red color".to_string(),
             operations: vec![
-                QueryOperation::ColorSimilarity { 
+                QueryOperation::ColorSimilarity {
                     hex: "#FF0000".to_string(), 
-                    tolerance: 50.0 
+                    tolerance: 50.0
                 },
                 QueryOperation::SurvivalOnly,
                 QueryOperation::Limit(15),

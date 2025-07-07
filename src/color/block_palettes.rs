@@ -1,5 +1,5 @@
-use super::{ExtendedColorData, palettes::GradientMethod};
-use crate::{BLOCKS, BlockFacts};
+use super::{palettes::GradientMethod, ExtendedColorData};
+use crate::{BlockFacts, BLOCKS};
 
 /// Generate palettes of actual Minecraft blocks based on color relationships
 pub struct BlockPaletteGenerator;
@@ -38,11 +38,11 @@ pub enum PaletteTheme {
 /// Role of a block in the palette
 #[derive(Debug, Clone, PartialEq)]
 pub enum BlockRole {
-    Primary,     // Main building material
-    Secondary,   // Supporting elements
-    Accent,      // Detail and contrast
-    Transition,  // Smooth color flow
-    Highlight,   // Eye-catching features
+    Primary,    // Main building material
+    Secondary,  // Supporting elements
+    Accent,     // Detail and contrast
+    Transition, // Smooth color flow
+    Highlight,  // Eye-catching features
 }
 
 /// Filter configuration for block selection
@@ -93,7 +93,7 @@ impl BlockFilter {
             include_patterns: vec![],
         }
     }
-    
+
     /// Create a filter for decorative blocks (allows more variety)
     pub fn decorative_blocks() -> Self {
         BlockFilter {
@@ -108,7 +108,7 @@ impl BlockFilter {
             include_patterns: vec![],
         }
     }
-    
+
     /// Create a filter for structural blocks (very conservative)
     pub fn structural_blocks_only() -> Self {
         BlockFilter {
@@ -137,71 +137,78 @@ impl BlockFilter {
             include_patterns: vec![],
         }
     }
-    
+
     /// Check if a block passes this filter
     pub fn allows_block(&self, block: &BlockFacts) -> bool {
         let id = block.id().to_lowercase();
-        
+
         // Check include patterns first (overrides excludes)
         if !self.include_patterns.is_empty() {
-            let included = self.include_patterns.iter().any(|pattern| id.contains(&pattern.to_lowercase()));
+            let included = self
+                .include_patterns
+                .iter()
+                .any(|pattern| id.contains(&pattern.to_lowercase()));
             if !included {
                 return false;
             }
         }
-        
+
         // Check exclude patterns
-        if self.exclude_patterns.iter().any(|pattern| id.contains(&pattern.to_lowercase())) {
+        if self
+            .exclude_patterns
+            .iter()
+            .any(|pattern| id.contains(&pattern.to_lowercase()))
+        {
             return false;
         }
-        
+
         // Check falling blocks
         if self.exclude_falling && Self::is_falling_block(&id) {
             return false;
         }
-        
+
         // Check tile entities
         if self.exclude_tile_entities && Self::is_tile_entity(&id) {
             return false;
         }
-        
+
         // Check full blocks only
         if self.full_blocks_only && !Self::is_full_block(&id) {
             return false;
         }
-        
+
         // Check needs support
         if self.exclude_needs_support && Self::needs_support(&id) {
             return false;
         }
-        
+
         // Check transparency
         if self.exclude_transparent && Self::is_transparent(&id) {
             return false;
         }
-        
+
         // Check light sources
         if self.exclude_light_sources && Self::is_light_source(&id) {
             return false;
         }
-        
+
         // Check survival obtainable
         if self.survival_obtainable_only && !Self::is_survival_obtainable(&id) {
             return false;
         }
-        
+
         true
     }
-    
+
     fn is_falling_block(id: &str) -> bool {
-        matches!(id, 
-            id if id.contains("sand") || 
-                  id.contains("gravel") || 
+        matches!(id,
+            id if id.contains("sand") ||
+                  id.contains("gravel") ||
                   id.contains("anvil") ||
                   id.contains("concrete_powder")
         )
     }
-    
+
     fn is_tile_entity(id: &str) -> bool {
         matches!(id,
             id if id.contains("chest") ||
@@ -222,7 +229,7 @@ impl BlockFilter {
                   id.contains("jukebox")
         )
     }
-    
+
     fn is_full_block(id: &str) -> bool {
         // Return false if it's a partial block
         !matches!(id,
@@ -243,7 +250,7 @@ impl BlockFilter {
                   id.contains("bars")
         )
     }
-    
+
     fn needs_support(id: &str) -> bool {
         matches!(id,
             id if id.contains("torch") ||
@@ -271,7 +278,7 @@ impl BlockFilter {
                   id.contains("painting")
         )
     }
-    
+
     fn is_transparent(id: &str) -> bool {
         matches!(id,
             id if id.contains("glass") ||
@@ -285,7 +292,7 @@ impl BlockFilter {
                   id.contains("structure_void")
         )
     }
-    
+
     fn is_light_source(id: &str) -> bool {
         matches!(id,
             id if id.contains("torch") ||
@@ -307,7 +314,7 @@ impl BlockFilter {
                   id.contains("amethyst_cluster")
         )
     }
-    
+
     fn is_survival_obtainable(id: &str) -> bool {
         // Exclude creative-only blocks
         !matches!(id,
@@ -332,9 +339,14 @@ impl BlockPaletteGenerator {
         end_block: &'static BlockFacts,
         steps: usize,
     ) -> Option<BlockPalette> {
-        Self::generate_block_gradient_filtered(start_block, end_block, steps, &BlockFilter::default())
+        Self::generate_block_gradient_filtered(
+            start_block,
+            end_block,
+            steps,
+            &BlockFilter::default(),
+        )
     }
-    
+
     /// Generate a gradient palette with custom filtering
     pub fn generate_block_gradient_filtered(
         start_block: &'static BlockFacts,
@@ -344,12 +356,15 @@ impl BlockPaletteGenerator {
     ) -> Option<BlockPalette> {
         let start_color = start_block.extras.color?.to_extended();
         let end_color = end_block.extras.color?.to_extended();
-        
+
         // Generate color gradient
         let color_gradient = super::palettes::PaletteGenerator::generate_gradient_palette(
-            start_color, end_color, steps, GradientMethod::LinearOklab
+            start_color,
+            end_color,
+            steps,
+            GradientMethod::LinearOklab,
         );
-        
+
         // Find blocks that match each color in the gradient
         let mut blocks = Vec::new();
         for (i, target_color) in color_gradient.iter().enumerate() {
@@ -360,9 +375,9 @@ impl BlockPaletteGenerator {
                     i if i == steps / 2 => BlockRole::Secondary,
                     _ => BlockRole::Transition,
                 };
-                
+
                 let usage_notes = Self::generate_usage_notes(&block, &role);
-                
+
                 blocks.push(BlockRecommendation {
                     block,
                     color: block.extras.color?.to_extended(),
@@ -371,9 +386,10 @@ impl BlockPaletteGenerator {
                 });
             }
         }
-        
+
         Some(BlockPalette {
-            name: format!("{} to {} Gradient", 
+            name: format!(
+                "{} to {} Gradient",
                 Self::block_display_name(start_block),
                 Self::block_display_name(end_block)
             ),
@@ -387,31 +403,30 @@ impl BlockPaletteGenerator {
             theme: PaletteTheme::Gradient,
         })
     }
-    
+
     /// Generate a monochrome palette around a base block
     pub fn generate_monochrome_palette(
         base_block: &'static BlockFacts,
         range: usize,
     ) -> Option<BlockPalette> {
         let base_color = base_block.extras.color?.to_extended();
-        
+
         // Generate monochrome color variations
-        let mono_colors = super::palettes::PaletteGenerator::generate_monochrome_palette(
-            base_color, range
-        );
-        
+        let mono_colors =
+            super::palettes::PaletteGenerator::generate_monochrome_palette(base_color, range);
+
         let mut blocks = Vec::new();
         for (i, target_color) in mono_colors.iter().enumerate() {
             if let Some(block) = Self::find_closest_block_to_color(*target_color) {
                 let role = match i {
-                    0 => BlockRole::Accent,      // Darkest
-                    i if i == range / 2 => BlockRole::Primary,    // Base
+                    0 => BlockRole::Accent,                      // Darkest
+                    i if i == range / 2 => BlockRole::Primary,   // Base
                     i if i == range - 1 => BlockRole::Highlight, // Lightest
                     _ => BlockRole::Secondary,
                 };
-                
+
                 let usage_notes = Self::generate_usage_notes(&block, &role);
-                
+
                 blocks.push(BlockRecommendation {
                     block,
                     color: block.extras.color?.to_extended(),
@@ -420,7 +435,7 @@ impl BlockPaletteGenerator {
                 });
             }
         }
-        
+
         Some(BlockPalette {
             name: format!("{} Monochrome", Self::block_display_name(base_block)),
             description: format!(
@@ -432,14 +447,13 @@ impl BlockPaletteGenerator {
             theme: PaletteTheme::Monochrome,
         })
     }
-    
+
     /// Generate a complementary palette
-    pub fn generate_complementary_palette(
-        base_block: &'static BlockFacts,
-    ) -> Option<BlockPalette> {
+    pub fn generate_complementary_palette(base_block: &'static BlockFacts) -> Option<BlockPalette> {
         let base_color = base_block.extras.color?.to_extended();
-        let comp_colors = super::palettes::PaletteGenerator::generate_complementary_palette(&base_color);
-        
+        let comp_colors =
+            super::palettes::PaletteGenerator::generate_complementary_palette(&base_color);
+
         let mut blocks = Vec::new();
         for (i, target_color) in comp_colors.iter().enumerate() {
             if let Some(block) = Self::find_closest_block_to_color(*target_color) {
@@ -448,9 +462,9 @@ impl BlockPaletteGenerator {
                     1 => BlockRole::Accent,
                     _ => BlockRole::Secondary,
                 };
-                
+
                 let usage_notes = Self::generate_usage_notes(&block, &role);
-                
+
                 blocks.push(BlockRecommendation {
                     block,
                     color: block.extras.color?.to_extended(),
@@ -459,7 +473,7 @@ impl BlockPaletteGenerator {
                 });
             }
         }
-        
+
         Some(BlockPalette {
             name: format!("{} Complementary", Self::block_display_name(base_block)),
             description: format!(
@@ -470,14 +484,17 @@ impl BlockPaletteGenerator {
             theme: PaletteTheme::Complementary,
         })
     }
-    
+
     /// Generate natural palettes based on Minecraft biomes/themes
     pub fn generate_natural_palette(theme: &str) -> Option<BlockPalette> {
         Self::generate_natural_palette_filtered(theme, &BlockFilter::default())
     }
-    
+
     /// Generate natural palettes with custom filtering
-    pub fn generate_natural_palette_filtered(theme: &str, filter: &BlockFilter) -> Option<BlockPalette> {
+    pub fn generate_natural_palette_filtered(
+        theme: &str,
+        filter: &BlockFilter,
+    ) -> Option<BlockPalette> {
         match theme.to_lowercase().as_str() {
             "forest" | "woods" => Self::generate_forest_palette_filtered(filter),
             "desert" | "sand" => Self::generate_desert_palette_filtered(filter),
@@ -488,14 +505,17 @@ impl BlockPaletteGenerator {
             _ => None,
         }
     }
-    
+
     /// Generate an architectural palette for building styles
     pub fn generate_architectural_palette(style: &str) -> Option<BlockPalette> {
         Self::generate_architectural_palette_filtered(style, &BlockFilter::default())
     }
-    
+
     /// Generate architectural palettes with custom filtering
-    pub fn generate_architectural_palette_filtered(style: &str, filter: &BlockFilter) -> Option<BlockPalette> {
+    pub fn generate_architectural_palette_filtered(
+        style: &str,
+        filter: &BlockFilter,
+    ) -> Option<BlockPalette> {
         match style.to_lowercase().as_str() {
             "medieval" => Self::generate_medieval_palette_filtered(filter),
             "modern" => Self::generate_modern_palette_filtered(filter),
@@ -504,12 +524,12 @@ impl BlockPaletteGenerator {
             _ => None,
         }
     }
-    
+
     /// Find the closest block to a target color
     fn find_closest_block_to_color(target_color: ExtendedColorData) -> Option<&'static BlockFacts> {
         let mut best_block = None;
         let mut best_distance = f32::INFINITY;
-        
+
         for block in BLOCKS.values() {
             if let Some(block_color) = block.extras.color {
                 let distance = block_color.to_extended().distance_oklab(&target_color);
@@ -519,35 +539,53 @@ impl BlockPaletteGenerator {
                 }
             }
         }
-        
+
         best_block
     }
-    
+
     /// Generate usage notes for a block in a specific role
     fn generate_usage_notes(block: &BlockFacts, role: &BlockRole) -> String {
         let block_type = Self::categorize_block(block);
-        
+
         match (role, block_type.as_str()) {
-            (BlockRole::Primary, "stone") => "Excellent for foundations, walls, and main structures".to_string(),
-            (BlockRole::Primary, "wood") => "Great for frames, floors, and warm architectural elements".to_string(),
-            (BlockRole::Primary, "concrete") => "Perfect for modern builds and large surfaces".to_string(),
-            
-            (BlockRole::Secondary, "stone") => "Use for detailing, trim, and structural accents".to_string(),
-            (BlockRole::Secondary, "wood") => "Ideal for stairs, slabs, and secondary features".to_string(),
-            (BlockRole::Secondary, _) => "Good for supporting elements and medium-scale features".to_string(),
-            
-            (BlockRole::Accent, _) => "Use sparingly for highlights, borders, and eye-catching details".to_string(),
-            (BlockRole::Transition, _) => "Perfect for gradual color changes and smooth blending".to_string(),
-            (BlockRole::Highlight, _) => "Excellent for focal points, lighting accents, and key features".to_string(),
-            
+            (BlockRole::Primary, "stone") => {
+                "Excellent for foundations, walls, and main structures".to_string()
+            }
+            (BlockRole::Primary, "wood") => {
+                "Great for frames, floors, and warm architectural elements".to_string()
+            }
+            (BlockRole::Primary, "concrete") => {
+                "Perfect for modern builds and large surfaces".to_string()
+            }
+
+            (BlockRole::Secondary, "stone") => {
+                "Use for detailing, trim, and structural accents".to_string()
+            }
+            (BlockRole::Secondary, "wood") => {
+                "Ideal for stairs, slabs, and secondary features".to_string()
+            }
+            (BlockRole::Secondary, _) => {
+                "Good for supporting elements and medium-scale features".to_string()
+            }
+
+            (BlockRole::Accent, _) => {
+                "Use sparingly for highlights, borders, and eye-catching details".to_string()
+            }
+            (BlockRole::Transition, _) => {
+                "Perfect for gradual color changes and smooth blending".to_string()
+            }
+            (BlockRole::Highlight, _) => {
+                "Excellent for focal points, lighting accents, and key features".to_string()
+            }
+
             _ => "Versatile block suitable for various building applications".to_string(),
         }
     }
-    
+
     /// Categorize a block by its material type
     fn categorize_block(block: &BlockFacts) -> String {
         let id = block.id().to_lowercase();
-        
+
         if id.contains("stone") || id.contains("cobblestone") || id.contains("brick") {
             "stone".to_string()
         } else if id.contains("wood") || id.contains("plank") || id.contains("log") {
@@ -564,10 +602,11 @@ impl BlockPaletteGenerator {
             "other".to_string()
         }
     }
-    
+
     /// Get a friendly display name for a block
     fn block_display_name(block: &BlockFacts) -> String {
-        block.id()
+        block
+            .id()
             .strip_prefix("minecraft:")
             .unwrap_or(block.id())
             .replace('_', " ")
@@ -582,199 +621,239 @@ impl BlockPaletteGenerator {
             .collect::<Vec<_>>()
             .join(" ")
     }
-    
+
     // Natural palette generators
     fn generate_forest_palette() -> Option<BlockPalette> {
         Self::generate_forest_palette_filtered(&BlockFilter::default())
     }
-    
+
     fn generate_forest_palette_filtered(filter: &BlockFilter) -> Option<BlockPalette> {
         let forest_blocks = [
-            "minecraft:oak_log", "minecraft:oak_leaves", "minecraft:grass_block",
-            "minecraft:coarse_dirt", "minecraft:moss_block", "minecraft:fern"
+            "minecraft:oak_log",
+            "minecraft:oak_leaves",
+            "minecraft:grass_block",
+            "minecraft:coarse_dirt",
+            "minecraft:moss_block",
+            "minecraft:fern",
         ];
-        
+
         Self::create_themed_palette_filtered(
             "Forest Biome",
             "Natural forest colors with browns, greens, and earth tones",
             &forest_blocks,
             PaletteTheme::Natural,
-            filter
+            filter,
         )
     }
-    
+
     fn generate_desert_palette() -> Option<BlockPalette> {
         Self::generate_desert_palette_filtered(&BlockFilter::default())
     }
-    
+
     fn generate_desert_palette_filtered(filter: &BlockFilter) -> Option<BlockPalette> {
         let desert_blocks = [
-            "minecraft:sand", "minecraft:sandstone", "minecraft:smooth_sandstone",
-            "minecraft:cut_sandstone", "minecraft:red_sand", "minecraft:terracotta"
+            "minecraft:sand",
+            "minecraft:sandstone",
+            "minecraft:smooth_sandstone",
+            "minecraft:cut_sandstone",
+            "minecraft:red_sand",
+            "minecraft:terracotta",
         ];
-        
+
         Self::create_themed_palette_filtered(
             "Desert Biome",
             "Warm sandy colors and sun-baked earth tones",
             &desert_blocks,
             PaletteTheme::Natural,
-            filter
+            filter,
         )
     }
-    
+
     fn generate_ocean_palette() -> Option<BlockPalette> {
         Self::generate_ocean_palette_filtered(&BlockFilter::default())
     }
-    
+
     fn generate_ocean_palette_filtered(filter: &BlockFilter) -> Option<BlockPalette> {
         let ocean_blocks = [
-            "minecraft:water", "minecraft:prismarine", "minecraft:dark_prismarine",
-            "minecraft:sea_lantern", "minecraft:kelp", "minecraft:sand"
+            "minecraft:water",
+            "minecraft:prismarine",
+            "minecraft:dark_prismarine",
+            "minecraft:sea_lantern",
+            "minecraft:kelp",
+            "minecraft:sand",
         ];
-        
+
         Self::create_themed_palette_filtered(
             "Ocean Biome",
             "Cool blues and aquatic colors for underwater builds",
             &ocean_blocks,
             PaletteTheme::Natural,
-            filter
+            filter,
         )
     }
-    
+
     fn generate_mountain_palette() -> Option<BlockPalette> {
         Self::generate_mountain_palette_filtered(&BlockFilter::default())
     }
-    
+
     fn generate_mountain_palette_filtered(filter: &BlockFilter) -> Option<BlockPalette> {
         let mountain_blocks = [
-            "minecraft:stone", "minecraft:cobblestone", "minecraft:andesite",
-            "minecraft:granite", "minecraft:diorite", "minecraft:gravel"
+            "minecraft:stone",
+            "minecraft:cobblestone",
+            "minecraft:andesite",
+            "minecraft:granite",
+            "minecraft:diorite",
+            "minecraft:gravel",
         ];
-        
+
         Self::create_themed_palette_filtered(
             "Mountain Biome",
             "Rocky grays and mineral tones for mountainous terrain",
             &mountain_blocks,
             PaletteTheme::Natural,
-            filter
+            filter,
         )
     }
-    
+
     fn generate_nether_palette() -> Option<BlockPalette> {
         Self::generate_nether_palette_filtered(&BlockFilter::default())
     }
-    
+
     fn generate_nether_palette_filtered(filter: &BlockFilter) -> Option<BlockPalette> {
         let nether_blocks = [
-            "minecraft:netherrack", "minecraft:nether_bricks", "minecraft:blackstone",
-            "minecraft:crimson_planks", "minecraft:warped_planks", "minecraft:soul_sand"
+            "minecraft:netherrack",
+            "minecraft:nether_bricks",
+            "minecraft:blackstone",
+            "minecraft:crimson_planks",
+            "minecraft:warped_planks",
+            "minecraft:soul_sand",
         ];
-        
+
         Self::create_themed_palette_filtered(
             "Nether Dimension",
             "Dark reds, blacks, and otherworldly colors",
             &nether_blocks,
             PaletteTheme::Natural,
-            filter
+            filter,
         )
     }
-    
+
     fn generate_end_palette() -> Option<BlockPalette> {
         Self::generate_end_palette_filtered(&BlockFilter::default())
     }
-    
+
     fn generate_end_palette_filtered(filter: &BlockFilter) -> Option<BlockPalette> {
         let end_blocks = [
-            "minecraft:end_stone", "minecraft:purpur_block", "minecraft:end_stone_bricks",
-            "minecraft:obsidian", "minecraft:chorus_flower", "minecraft:chorus_plant"
+            "minecraft:end_stone",
+            "minecraft:purpur_block",
+            "minecraft:end_stone_bricks",
+            "minecraft:obsidian",
+            "minecraft:chorus_flower",
+            "minecraft:chorus_plant",
         ];
-        
+
         Self::create_themed_palette_filtered(
             "End Dimension",
             "Pale yellows, purples, and ethereal tones",
             &end_blocks,
             PaletteTheme::Natural,
-            filter
+            filter,
         )
     }
-    
+
     // Architectural palette generators
     fn generate_medieval_palette() -> Option<BlockPalette> {
         Self::generate_medieval_palette_filtered(&BlockFilter::default())
     }
-    
+
     fn generate_medieval_palette_filtered(filter: &BlockFilter) -> Option<BlockPalette> {
         let medieval_blocks = [
-            "minecraft:cobblestone", "minecraft:oak_planks", "minecraft:stone_bricks",
-            "minecraft:dark_oak_planks", "minecraft:mossy_cobblestone", "minecraft:oak_log"
+            "minecraft:cobblestone",
+            "minecraft:oak_planks",
+            "minecraft:stone_bricks",
+            "minecraft:dark_oak_planks",
+            "minecraft:mossy_cobblestone",
+            "minecraft:oak_log",
         ];
-        
+
         Self::create_themed_palette_filtered(
             "Medieval Architecture",
             "Traditional building materials for castles and medieval structures",
             &medieval_blocks,
             PaletteTheme::Architectural,
-            filter
+            filter,
         )
     }
-    
+
     fn generate_modern_palette() -> Option<BlockPalette> {
         Self::generate_modern_palette_filtered(&BlockFilter::default())
     }
-    
+
     fn generate_modern_palette_filtered(filter: &BlockFilter) -> Option<BlockPalette> {
         let modern_blocks = [
-            "minecraft:white_concrete", "minecraft:light_gray_concrete", "minecraft:glass",
-            "minecraft:iron_block", "minecraft:quartz_block", "minecraft:black_concrete"
+            "minecraft:white_concrete",
+            "minecraft:light_gray_concrete",
+            "minecraft:glass",
+            "minecraft:iron_block",
+            "minecraft:quartz_block",
+            "minecraft:black_concrete",
         ];
-        
+
         Self::create_themed_palette_filtered(
             "Modern Architecture",
             "Clean lines and contemporary materials for modern builds",
             &modern_blocks,
             PaletteTheme::Architectural,
-            filter
+            filter,
         )
     }
-    
+
     fn generate_rustic_palette() -> Option<BlockPalette> {
         Self::generate_rustic_palette_filtered(&BlockFilter::default())
     }
-    
+
     fn generate_rustic_palette_filtered(filter: &BlockFilter) -> Option<BlockPalette> {
         let rustic_blocks = [
-            "minecraft:stripped_oak_log", "minecraft:cobblestone", "minecraft:coarse_dirt",
-            "minecraft:hay_bale", "minecraft:oak_fence", "minecraft:stone"
+            "minecraft:stripped_oak_log",
+            "minecraft:cobblestone",
+            "minecraft:coarse_dirt",
+            "minecraft:hay_bale",
+            "minecraft:oak_fence",
+            "minecraft:stone",
         ];
-        
+
         Self::create_themed_palette_filtered(
             "Rustic Style",
             "Natural materials for farmhouses and country builds",
             &rustic_blocks,
             PaletteTheme::Architectural,
-            filter
+            filter,
         )
     }
-    
+
     fn generate_industrial_palette() -> Option<BlockPalette> {
         Self::generate_industrial_palette_filtered(&BlockFilter::default())
     }
-    
+
     fn generate_industrial_palette_filtered(filter: &BlockFilter) -> Option<BlockPalette> {
         let industrial_blocks = [
-            "minecraft:iron_block", "minecraft:gray_concrete", "minecraft:observer",
-            "minecraft:anvil", "minecraft:cauldron", "minecraft:redstone_block"
+            "minecraft:iron_block",
+            "minecraft:gray_concrete",
+            "minecraft:observer",
+            "minecraft:anvil",
+            "minecraft:cauldron",
+            "minecraft:redstone_block",
         ];
-        
+
         Self::create_themed_palette_filtered(
             "Industrial Style",
             "Metallic and mechanical blocks for factories and tech builds",
             &industrial_blocks,
             PaletteTheme::Architectural,
-            filter
+            filter,
         )
     }
-    
+
     /// Helper to create themed palettes
     fn create_themed_palette(
         name: &str,
@@ -782,9 +861,15 @@ impl BlockPaletteGenerator {
         block_ids: &[&str],
         theme: PaletteTheme,
     ) -> Option<BlockPalette> {
-        Self::create_themed_palette_filtered(name, description, block_ids, theme, &BlockFilter::default())
+        Self::create_themed_palette_filtered(
+            name,
+            description,
+            block_ids,
+            theme,
+            &BlockFilter::default(),
+        )
     }
-    
+
     /// Helper to create themed palettes with filtering
     fn create_themed_palette_filtered(
         name: &str,
@@ -794,27 +879,29 @@ impl BlockPaletteGenerator {
         filter: &BlockFilter,
     ) -> Option<BlockPalette> {
         let mut blocks = Vec::new();
-        
+
         for (i, block_id) in block_ids.iter().enumerate() {
             if let Some(block) = BLOCKS.get(*block_id) {
                 // Apply filter
                 if !filter.allows_block(block) {
                     continue;
                 }
-                
+
                 let role = match i {
                     0 => BlockRole::Primary,
                     1 => BlockRole::Secondary,
                     _ if i == block_ids.len() - 1 => BlockRole::Accent,
                     _ => BlockRole::Transition,
                 };
-                
-                let color = block.extras.color
+
+                let color = block
+                    .extras
+                    .color
                     .map(|c| c.to_extended())
                     .unwrap_or_else(|| ExtendedColorData::from_rgb(128, 128, 128));
-                
+
                 let usage_notes = Self::generate_usage_notes(block, &role);
-                
+
                 blocks.push(BlockRecommendation {
                     block: *block,
                     color,
@@ -823,11 +910,11 @@ impl BlockPaletteGenerator {
                 });
             }
         }
-        
+
         if blocks.is_empty() {
             return None;
         }
-        
+
         Some(BlockPalette {
             name: name.to_string(),
             description: description.to_string(),
@@ -835,14 +922,15 @@ impl BlockPaletteGenerator {
             theme,
         })
     }
-    
+
     /// Find blocks by color similarity for custom palettes
     pub fn find_blocks_by_color_range(
         target_color: ExtendedColorData,
         tolerance: f32,
         max_blocks: usize,
     ) -> Vec<&'static BlockFacts> {
-        let mut candidates: Vec<_> = BLOCKS.values()
+        let mut candidates: Vec<_> = BLOCKS
+            .values()
             .filter_map(|block| {
                 block.extras.color.map(|color| {
                     let distance = color.to_extended().distance_oklab(&target_color);
@@ -851,19 +939,20 @@ impl BlockPaletteGenerator {
             })
             .filter(|(_, distance)| *distance <= tolerance)
             .collect();
-        
+
         candidates.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-        candidates.into_iter()
+        candidates
+            .into_iter()
             .take(max_blocks)
             .map(|(block, _)| block)
             .collect()
     }
-    
+
     /// Get all available natural themes
     pub fn get_natural_themes() -> Vec<&'static str> {
         vec!["forest", "desert", "ocean", "mountain", "nether", "end"]
     }
-    
+
     /// Get all available architectural styles
     pub fn get_architectural_styles() -> Vec<&'static str> {
         vec!["medieval", "modern", "rustic", "industrial"]
@@ -876,7 +965,7 @@ impl BlockPalette {
         let mut output = String::new();
         output.push_str(&format!("# {}\n", self.name));
         output.push_str(&format!("{}\n\n", self.description));
-        
+
         for recommendation in &self.blocks {
             output.push_str(&format!(
                 "- {} ({}): {}\n",
@@ -885,10 +974,10 @@ impl BlockPalette {
                 recommendation.usage_notes
             ));
         }
-        
+
         output
     }
-    
+
     /// Export palette as JSON for programmatic use
     pub fn to_json(&self) -> String {
         serde_json::json!({
@@ -904,9 +993,10 @@ impl BlockPalette {
                     "usage": rec.usage_notes
                 })
             }).collect::<Vec<_>>()
-        }).to_string()
+        })
+        .to_string()
     }
-    
+
     /// Format block ID into a readable name
     fn format_block_name(id: &str) -> String {
         id.strip_prefix("minecraft:")
