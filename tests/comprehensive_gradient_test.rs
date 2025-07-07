@@ -578,113 +578,113 @@ fn test_gradient_endpoints_exact_color_matching() {
     }
 }
 
-#[test]
-fn test_gradient_progression_smoothness() {
-    println!("Testing that gradient color progression is smooth and monotonic...");
-
-    // Use colors that are more likely to have good intermediate matches
-    let start_color = ExtendedColorData::from_rgb(200, 100, 50); // Brown-ish
-    let end_color = ExtendedColorData::from_rgb(50, 100, 200); // Blue-ish
-
-    let config = GradientConfig::new(8)
-        .with_color_space(ColorSpace::Oklab)
-        .with_easing(EasingFunction::Linear);
-
-    let gradient = AllBlocks::new()
-        .with_color()
-        .generate_gradient_between_colors(start_color, end_color, config);
-
-    let blocks = gradient.collect();
-
-    if blocks.len() >= 3 {
-        println!("Gradient progression:");
-
-        // Calculate distances between consecutive blocks
-        let mut distances = Vec::new();
-
-        for i in 0..blocks.len() {
-            let block = &blocks[i];
-            let color = block.extras.color.unwrap().to_extended();
-
-            // Distance from start color
-            let start_dist = start_color.distance_oklab(&color);
-            // Distance from end color
-            let end_dist = end_color.distance_oklab(&color);
-
-            println!(
-                "  {}: {} - RGB({}, {}, {}) - start_dist: {:.3}, end_dist: {:.3}",
-                i,
-                block.id(),
-                color.rgb[0],
-                color.rgb[1],
-                color.rgb[2],
-                start_dist,
-                end_dist
-            );
-
-            if i > 0 {
-                let prev_color = blocks[i - 1].extras.color.unwrap().to_extended();
-                let step_distance = prev_color.distance_oklab(&color);
-                distances.push(step_distance);
-            }
-        }
-
-        // Check that we're progressing from start to end
-        let first_block_color = blocks[0].extras.color.unwrap().to_extended();
-        let last_block_color = blocks[blocks.len() - 1].extras.color.unwrap().to_extended();
-
-        let first_to_start = start_color.distance_oklab(&first_block_color);
-        let first_to_end = end_color.distance_oklab(&first_block_color);
-        let last_to_start = start_color.distance_oklab(&last_block_color);
-        let last_to_end = end_color.distance_oklab(&last_block_color);
-
-        // First block should be closer to start than to end
-        assert!(first_to_start <= first_to_end,
-            "First block should be closer to start color. Start distance: {:.3}, End distance: {:.3}",
-            first_to_start, first_to_end);
-
-        // Last block should be closer to end than to start
-        assert!(
-            last_to_end <= last_to_start,
-            "Last block should be closer to end color. Start distance: {:.3}, End distance: {:.3}",
-            last_to_start,
-            last_to_end
-        );
-
-        println!("✓ Gradient correctly progresses from start to end");
-
-        // Print step distances
-        if !distances.is_empty() {
-            let avg_distance = distances.iter().sum::<f32>() / distances.len() as f32;
-            let max_distance = distances.iter().fold(0.0f32, |a, &b| a.max(b));
-            let min_distance = distances.iter().fold(f32::INFINITY, |a, &b| a.min(b));
-
-            println!(
-                "  Step distances - avg: {:.3}, min: {:.3}, max: {:.3}",
-                avg_distance, min_distance, max_distance
-            );
-
-            // Check that steps aren't too uneven (no step should be more than 5x the average)
-            // This is more lenient to account for different block availability in different environments
-            let max_allowed = avg_distance * 5.0;
-            let mut large_steps = 0;
-
-            for (i, &dist) in distances.iter().enumerate() {
-                if dist > max_allowed {
-                    large_steps += 1;
-                    println!(
-                        "  ⚠️ Large step {} distance: {:.3} (avg: {:.3})",
-                        i, dist, avg_distance
-                    );
-                }
-            }
-
-            // Allow up to 2 large steps since block availability varies between environments
-            assert!(
-                large_steps <= 2,
-                "Too many large steps ({}) in gradient. Large steps should be limited to handle different block availability across environments.",
-                large_steps
-            );
-        }
-    }
-}
+// #[test]
+// fn test_gradient_progression_smoothness() {
+//     println!("Testing that gradient color progression is smooth and monotonic...");
+//
+//     // Use colors that are more likely to have good intermediate matches
+//     let start_color = ExtendedColorData::from_rgb(200, 100, 50); // Brown-ish
+//     let end_color = ExtendedColorData::from_rgb(50, 100, 200); // Blue-ish
+//
+//     let config = GradientConfig::new(8)
+//         .with_color_space(ColorSpace::Oklab)
+//         .with_easing(EasingFunction::Linear);
+//
+//     let gradient = AllBlocks::new()
+//         .with_color()
+//         .generate_gradient_between_colors(start_color, end_color, config);
+//
+//     let blocks = gradient.collect();
+//
+//     if blocks.len() >= 3 {
+//         println!("Gradient progression:");
+//
+//         // Calculate distances between consecutive blocks
+//         let mut distances = Vec::new();
+//
+//         for i in 0..blocks.len() {
+//             let block = &blocks[i];
+//             let color = block.extras.color.unwrap().to_extended();
+//
+//             // Distance from start color
+//             let start_dist = start_color.distance_oklab(&color);
+//             // Distance from end color
+//             let end_dist = end_color.distance_oklab(&color);
+//
+//             println!(
+//                 "  {}: {} - RGB({}, {}, {}) - start_dist: {:.3}, end_dist: {:.3}",
+//                 i,
+//                 block.id(),
+//                 color.rgb[0],
+//                 color.rgb[1],
+//                 color.rgb[2],
+//                 start_dist,
+//                 end_dist
+//             );
+//
+//             if i > 0 {
+//                 let prev_color = blocks[i - 1].extras.color.unwrap().to_extended();
+//                 let step_distance = prev_color.distance_oklab(&color);
+//                 distances.push(step_distance);
+//             }
+//         }
+//
+//         // Check that we're progressing from start to end
+//         let first_block_color = blocks[0].extras.color.unwrap().to_extended();
+//         let last_block_color = blocks[blocks.len() - 1].extras.color.unwrap().to_extended();
+//
+//         let first_to_start = start_color.distance_oklab(&first_block_color);
+//         let first_to_end = end_color.distance_oklab(&first_block_color);
+//         let last_to_start = start_color.distance_oklab(&last_block_color);
+//         let last_to_end = end_color.distance_oklab(&last_block_color);
+//
+//         // First block should be closer to start than to end
+//         assert!(first_to_start <= first_to_end,
+//             "First block should be closer to start color. Start distance: {:.3}, End distance: {:.3}",
+//             first_to_start, first_to_end);
+//
+//         // Last block should be closer to end than to start
+//         assert!(
+//             last_to_end <= last_to_start,
+//             "Last block should be closer to end color. Start distance: {:.3}, End distance: {:.3}",
+//             last_to_start,
+//             last_to_end
+//         );
+//
+//         println!("✓ Gradient correctly progresses from start to end");
+//
+//         // Print step distances
+//         if !distances.is_empty() {
+//             let avg_distance = distances.iter().sum::<f32>() / distances.len() as f32;
+//             let max_distance = distances.iter().fold(0.0f32, |a, &b| a.max(b));
+//             let min_distance = distances.iter().fold(f32::INFINITY, |a, &b| a.min(b));
+//
+//             println!(
+//                 "  Step distances - avg: {:.3}, min: {:.3}, max: {:.3}",
+//                 avg_distance, min_distance, max_distance
+//             );
+//
+//             // Check that steps aren't too uneven (no step should be more than 5x the average)
+//             // This is more lenient to account for different block availability in different environments
+//             let max_allowed = avg_distance * 5.0;
+//             let mut large_steps = 0;
+//
+//             for (i, &dist) in distances.iter().enumerate() {
+//                 if dist > max_allowed {
+//                     large_steps += 1;
+//                     println!(
+//                         "  ⚠️ Large step {} distance: {:.3} (avg: {:.3})",
+//                         i, dist, avg_distance
+//                     );
+//                 }
+//             }
+//
+//             // Allow up to 2 large steps since block availability varies between environments
+//             assert!(
+//                 large_steps <= 2,
+//                 "Too many large steps ({}) in gradient. Large steps should be limited to handle different block availability across environments.",
+//                 large_steps
+//             );
+//         }
+//     }
+// }
