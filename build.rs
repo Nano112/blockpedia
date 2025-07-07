@@ -60,7 +60,7 @@ mod data_sources_build {
                     .and_then(|n| n.as_str())
                     .context("Block missing name field")?;
 
-                let id = format!("minecraft:{}", name);
+                let id = format!("minecraft:{name}");
 
                 // Convert states to properties
                 let mut properties = HashMap::new();
@@ -96,7 +96,7 @@ mod data_sources_build {
                                                 .collect()
                                         } else {
                                             (0..num_values)
-                                                .map(|i| format!("value_{}", i))
+                                .map(|i| format!("value_{i}"))
                                                 .collect()
                                         }
                                     }
@@ -141,7 +141,7 @@ mod data_sources_build {
             for (i, block_data) in blocks_array.iter().take(3).enumerate() {
                 let block_obj = block_data
                     .as_object()
-                    .with_context(|| format!("Block at index {} is not an object", i))?;
+                    .with_context(|| format!("Block at index {i} is not an object"))?;
 
                 if !block_obj.contains_key("name") {
                     anyhow::bail!("Block at index {} missing 'name' field", i);
@@ -283,7 +283,7 @@ mod data_sources_build {
             match self.fetch_with_fallback(primary) {
                 Ok(blocks) => Ok(blocks),
                 Err(e) => {
-                    println!("cargo:warning=All data sources failed: {}", e);
+                    println!("cargo:warning=All data sources failed: {e}");
                     anyhow::bail!("Could not fetch data from any source: {}", e)
                 }
             }
@@ -483,8 +483,7 @@ impl FetcherRegistry {
         }
 
         println!(
-            "cargo:warning=Extracting colors from textures in {:?}",
-            textures_dir
+            "cargo:warning=Extracting colors from textures in {textures_dir:?}"
         );
 
         // Scan texture files
