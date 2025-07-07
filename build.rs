@@ -95,9 +95,7 @@ mod data_sources_build {
                                                 .filter_map(|v| v.as_str().map(|s| s.to_string()))
                                                 .collect()
                                         } else {
-                                            (0..num_values)
-                                .map(|i| format!("value_{i}"))
-                                                .collect()
+                                            (0..num_values).map(|i| format!("value_{i}")).collect()
                                         }
                                     }
                                     _ => vec!["unknown".to_string()],
@@ -482,9 +480,7 @@ impl FetcherRegistry {
             return Ok(());
         }
 
-        println!(
-            "cargo:warning=Extracting colors from textures in {textures_dir:?}"
-        );
+        println!("cargo:warning=Extracting colors from textures in {textures_dir:?}");
 
         // Scan texture files
         let texture_files: Vec<String> = std::fs::read_dir(textures_dir)
