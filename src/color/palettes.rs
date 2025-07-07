@@ -216,10 +216,11 @@ fn hsl_to_rgb(h: f32, s: f32, l: f32) -> [u8; 3] {
 }
 
 /// Helper function to convert Oklab to RGB (simplified)
+#[allow(clippy::manual_clamp, clippy::excessive_precision)] // Scientific precision required for color conversion
 fn oklab_to_rgb(oklab: [f32; 3]) -> [u8; 3] {
     // Simplified Oklab to RGB conversion
     // In a production system, you'd want to use a proper color space library
-    let l = oklab[0].max(0.0).min(1.0);
+    let l = oklab[0].clamp(0.0, 1.0);
     let a = oklab[1];
     let b = oklab[2];
 

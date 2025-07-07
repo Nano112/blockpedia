@@ -50,11 +50,15 @@ fn main() {
 
         // Show first 20 blocks per category
         for (i, block_id) in blocks.iter().enumerate() {
-            if i < 20 {
-                println!("   • {}", block_id);
-            } else if i == 20 {
-                println!("   ... and {} more", blocks.len() - 20);
-                break;
+            match i.cmp(&20) {
+                std::cmp::Ordering::Less => {
+                    println!("   • {}", block_id);
+                }
+                std::cmp::Ordering::Equal => {
+                    println!("   ... and {} more", blocks.len() - 20);
+                    break;
+                }
+                std::cmp::Ordering::Greater => break,
             }
         }
     }

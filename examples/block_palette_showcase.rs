@@ -54,11 +54,11 @@ fn showcase_natural_palettes() {
                     .replace('_', " ");
 
                 println!(
-                    "     {}. {} {} - {} ({})",
+                    "     {}. {} {} - {:?} ({})",
                     i + 1,
                     rec.color.hex_string(),
                     block_name,
-                    format!("{:?}", rec.role),
+                    rec.role,
                     rec.usage_notes.split('.').next().unwrap_or("General use")
                 );
             }
@@ -153,7 +153,7 @@ fn showcase_block_gradients() {
         .collect();
 
     if colored_blocks.len() >= 6 {
-        let gradient_examples = vec![
+        let gradient_examples = [
             (
                 colored_blocks
                     .iter()
@@ -254,7 +254,7 @@ fn showcase_monochrome_palettes() {
     println!("=====================\n");
 
     // Create monochrome examples with different base blocks
-    let base_examples = vec![
+    let base_examples = [
         (
             "stone",
             "Classic Gray Monochrome",
@@ -314,11 +314,11 @@ fn showcase_monochrome_palettes() {
                     };
 
                     println!(
-                        "     {}: {} {} - {} ({})",
+                        "     {}: {} {} - {:?} ({})",
                         tone_description,
                         rec.color.hex_string(),
                         block_name,
-                        format!("{:?}", rec.role),
+                        rec.role,
                         rec.usage_notes.split('.').next().unwrap_or("General use")
                     );
                 }
@@ -426,11 +426,11 @@ fn showcase_complementary_palettes() {
                     };
 
                     println!(
-                        "     {}: {} {} - {} ({})",
+                        "     {}: {} {} - {:?} ({})",
                         relationship,
                         rec.color.hex_string(),
                         block_name,
-                        format!("{:?}", rec.role),
+                        rec.role,
                         rec.usage_notes
                             .split('.')
                             .next()

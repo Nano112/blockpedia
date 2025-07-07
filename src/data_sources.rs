@@ -250,6 +250,7 @@ impl DataSourceRegistry {
         self.sources.iter().map(|s| s.name()).collect()
     }
 
+    #[allow(clippy::ptr_arg)] // Vec is intentional for this API
     pub fn merge_data_sources(&self, _unified_blocks: &mut Vec<UnifiedBlockData>) -> Result<()> {
         // Logic to merge data from multiple sources
         // For now, just use primary source data

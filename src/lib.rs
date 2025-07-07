@@ -9,7 +9,7 @@ pub struct BlockFacts {
     pub extras: Extras,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Extras {
     // Future extension point for fetcher data
     pub mock_data: Option<i32>,
@@ -34,15 +34,6 @@ impl From<color::ExtendedColorData> for ColorData {
         ColorData {
             rgb: extended.rgb,
             oklab: extended.oklab,
-        }
-    }
-}
-
-impl Default for Extras {
-    fn default() -> Self {
-        Extras {
-            mock_data: None,
-            color: None,
         }
     }
 }

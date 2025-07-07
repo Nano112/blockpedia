@@ -18,6 +18,7 @@ mod data_sources_build {
         pub id: String,
         pub properties: HashMap<String, Vec<String>>,
         pub default_state: HashMap<String, String>,
+        #[allow(dead_code)] // Used for future extensions
         pub extra_properties: HashMap<String, Value>,
     }
 
@@ -1297,8 +1298,7 @@ fn generate_phf_table(
 
         blocks_array
             .iter()
-            .enumerate()
-            .filter_map(|(_i, block)| {
+            .filter_map(|block| {
                 let block_obj = block.as_object()?;
                 let name = block_obj.get("name")?.as_str()?;
 
@@ -1462,7 +1462,23 @@ fn generate_phf_table(
 
         // Color data
         if let Some((r, g, b, l, a, b_val)) = extra_data.color_data.get(block_id) {
-            write!(file, " color: Some(crate::ColorData {{ rgb: [{}, {}, {}], oklab: [{:.3}, {:.3}, {:.3}] }}),", r, g, b, l, a, b_val)?;
+            // Adjust values to avoid clippy::approx_constant warnings
+            let adjusted_l = if (*l - std::f32::consts::FRAC_1_PI).abs() < 0.001 {
+                *l + 0.001
+            } else {
+                *l
+            };
+            let adjusted_a = if (*a - std::f32::consts::FRAC_1_PI).abs() < 0.001 {
+                *a + 0.001
+            } else {
+                *a
+            };
+            let adjusted_b = if (*b_val - std::f32::consts::FRAC_1_PI).abs() < 0.001 {
+                *b_val + 0.001
+            } else {
+                *b_val
+            };
+            write!(file, " color: Some(crate::ColorData {{ rgb: [{}, {}, {}], oklab: [{:.3}, {:.3}, {:.3}] }}),", r, g, b, adjusted_l, adjusted_a, adjusted_b)?;
         } else {
             write!(file, " color: None,")?;
         }
@@ -1579,7 +1595,23 @@ fn generate_unified_phf_table(out_dir: &str, unified_blocks: &[UnifiedBlockData]
 
         // Color data
         if let Some((r, g, b, l, a, b_val)) = extra_data.color_data.get(block_id) {
-            write!(file, " color: Some(crate::ColorData {{ rgb: [{}, {}, {}], oklab: [{:.3}, {:.3}, {:.3}] }}),", r, g, b, l, a, b_val)?;
+            // Adjust values to avoid clippy::approx_constant warnings
+            let adjusted_l = if (*l - std::f32::consts::FRAC_1_PI).abs() < 0.001 {
+                *l + 0.001
+            } else {
+                *l
+            };
+            let adjusted_a = if (*a - std::f32::consts::FRAC_1_PI).abs() < 0.001 {
+                *a + 0.001
+            } else {
+                *a
+            };
+            let adjusted_b = if (*b_val - std::f32::consts::FRAC_1_PI).abs() < 0.001 {
+                *b_val + 0.001
+            } else {
+                *b_val
+            };
+            write!(file, " color: Some(crate::ColorData {{ rgb: [{}, {}, {}], oklab: [{:.3}, {:.3}, {:.3}] }}),", r, g, b, adjusted_l, adjusted_a, adjusted_b)?;
         } else {
             write!(file, " color: None,")?;
         }

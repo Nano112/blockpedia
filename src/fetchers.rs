@@ -123,6 +123,12 @@ pub struct ColorFetcher {
     csv_data: String,
 }
 
+impl Default for ColorFetcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ColorFetcher {
     pub fn new() -> Self {
         // In a real implementation, this would read from a bundled CSV file
@@ -302,7 +308,7 @@ impl FetcherRegistry {
         for fetcher in &self.fetchers {
             let fetcher_data = fetcher.fetch()?;
             for (block_id, blob) in fetcher_data {
-                all_data.entry(block_id).or_insert_with(Vec::new).push(blob);
+                all_data.entry(block_id).or_default().push(blob);
             }
         }
 

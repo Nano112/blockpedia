@@ -41,7 +41,7 @@ mod milestone1_tests {
 // Milestone 7 Tests: Error Handling & Validation
 #[cfg(test)]
 mod milestone7_tests {
-    use crate::{errors::*, queries::validated::*, BlockState};
+    use crate::{errors::*, queries::validated::*};
 
     #[test]
     fn validation_rejects_invalid_block_ids() {
@@ -279,7 +279,7 @@ mod milestone5_tests {
         assert!(!families.is_empty());
 
         // Validate some family groupings if applicable in test data
-        for (_, blocks) in &families {
+        for blocks in families.values() {
             assert!(!blocks.is_empty());
         }
     }
@@ -532,7 +532,7 @@ mod milestone4_tests {
         assert!(!families.is_empty());
 
         // Each family should have at least one block
-        for (_, blocks) in &families {
+        for blocks in families.values() {
             assert!(!blocks.is_empty());
         }
     }
@@ -563,7 +563,7 @@ mod milestone4_tests {
         assert!(!rare.is_empty());
 
         // Each property should have a count
-        for (_, count) in &rare {
+        for count in rare.values() {
             assert!(*count > 0);
         }
     }

@@ -4,7 +4,7 @@ use blockpedia::*;
 #[test]
 fn test_basic_query_creation() {
     let query = AllBlocks::new();
-    assert!(query.len() > 0, "Query should start with all blocks");
+    assert!(!query.is_empty(), "Query should start with all blocks");
 
     let all_blocks = AllBlocks::new();
     assert_eq!(
@@ -48,18 +48,18 @@ fn test_property_filtering() {
     // Test filtering by property existence
     let with_delay = query.clone().with_property("delay");
     assert!(
-        with_delay.len() > 0,
+        !with_delay.is_empty(),
         "Should find blocks with delay property"
     );
 
     // Test filtering by property value
     let delay_1 = query.clone().with_property_value("delay", "1");
-    assert!(delay_1.len() > 0, "Should find blocks with delay=1");
+    assert!(!delay_1.is_empty(), "Should find blocks with delay=1");
 
     // Test multiple property filters
     let multiple_props = query.clone().with_property("delay").with_property("facing");
     assert!(
-        multiple_props.len() > 0,
+        !multiple_props.is_empty(),
         "Should find blocks with both properties"
     );
 }
@@ -70,7 +70,7 @@ fn test_color_filtering() {
 
     // Test blocks with color data
     let with_color = query.clone().with_color();
-    assert!(with_color.len() > 0, "Should find blocks with color data");
+    assert!(!with_color.is_empty(), "Should find blocks with color data");
 
     // Verify all returned blocks have color data
     for block in with_color.collect() {
@@ -89,18 +89,18 @@ fn test_pattern_matching() {
     // Test exact pattern matching
     let stone_blocks = query.clone().matching("*stone*");
     assert!(
-        stone_blocks.len() > 0,
+        !stone_blocks.is_empty(),
         "Should find blocks with 'stone' in name"
     );
 
     // Test specific namespace
     let minecraft_blocks = query.clone().matching("minecraft:*");
-    assert!(minecraft_blocks.len() > 0, "Should find minecraft blocks");
+    assert!(!minecraft_blocks.is_empty(), "Should find minecraft blocks");
 
     // Test multiple patterns
     let multi_pattern = query.clone().matching("*stone*");
     assert!(
-        multi_pattern.len() > 0,
+        !multi_pattern.is_empty(),
         "Should find blocks matching pattern"
     );
 }
@@ -173,7 +173,7 @@ fn test_sorting() {
 fn test_color_similarity() {
     let query = AllBlocks::new().with_color();
 
-    if query.len() > 0 {
+    if !query.is_empty() {
         // Test color similarity search
         let target_color = ExtendedColorData::from_rgb(128, 128, 128);
         let similar = query.clone().similar_to_color(target_color, 50.0);
@@ -287,7 +287,7 @@ fn test_multi_gradient() {
     );
 
     // If we have colored blocks available, we should get some result
-    if query.len() > 0 {
+    if !query.is_empty() {
         // The implementation might return 0 blocks if the algorithm doesn't find suitable matches
         // This is acceptable behavior, so we just test that it runs without error
         println!(
@@ -339,11 +339,11 @@ fn test_query_information() {
     let query = AllBlocks::new();
 
     // Test count
-    assert!(query.len() > 0, "Query should have blocks");
+    assert!(!query.is_empty(), "Query should have blocks");
 
     // Test collecting
     let blocks = query.collect();
-    assert!(blocks.len() > 0, "Collect should yield blocks");
+    assert!(!blocks.is_empty(), "Collect should yield blocks");
 
     // Test any
     let has_blocks = AllBlocks::new().any();
@@ -490,7 +490,7 @@ fn test_realistic_use_cases() {
         .limit(20);
 
     // Should find some blocks suitable for building
-    assert!(building_blocks.len() > 0, "Should find building blocks");
+    assert!(!building_blocks.is_empty(), "Should find building blocks");
 
     // Test: Create a warm color palette
     let config = GradientConfig::new(8)
@@ -501,7 +501,7 @@ fn test_realistic_use_cases() {
         .generate_gradient(config)
         .sort_by_color_gradient();
 
-    if warm_palette.len() > 0 {
+    if !warm_palette.is_empty() {
         assert!(warm_palette.len() <= 8, "Warm palette should respect limit");
     }
 

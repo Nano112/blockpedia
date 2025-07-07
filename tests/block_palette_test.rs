@@ -219,8 +219,10 @@ fn test_decorative_blocks_filter() {
 #[test]
 fn test_custom_filters() {
     // Test include patterns
-    let mut concrete_only = BlockFilter::default();
-    concrete_only.include_patterns = vec!["concrete".to_string()];
+    let concrete_only = BlockFilter {
+        include_patterns: vec!["concrete".to_string()],
+        ..Default::default()
+    };
 
     if let Some(white_concrete) = BLOCKS.get("minecraft:white_concrete") {
         assert!(concrete_only.allows_block(white_concrete));
@@ -231,8 +233,10 @@ fn test_custom_filters() {
     }
 
     // Test exclude patterns
-    let mut no_glass = BlockFilter::default();
-    no_glass.exclude_patterns = vec!["glass".to_string()];
+    let no_glass = BlockFilter {
+        exclude_patterns: vec!["glass".to_string()],
+        ..Default::default()
+    };
 
     if let Some(glass_block) = BLOCKS.get("minecraft:glass") {
         assert!(!no_glass.allows_block(glass_block));

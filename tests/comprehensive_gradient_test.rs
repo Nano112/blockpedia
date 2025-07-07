@@ -1,5 +1,6 @@
 use blockpedia::color::ExtendedColorData;
 use blockpedia::query_builder::*;
+#[allow(unused_imports)]
 use blockpedia::*;
 
 #[test]
@@ -67,18 +68,17 @@ fn test_comprehensive_gradient_generation() {
                     );
 
                     // If we have colored blocks, we should get some result for reasonable sizes
-                    if size > 0 && AllBlocks::new().with_color().len() > 0 {
-                        if size <= 10 {
-                            // For reasonable sizes, we should get some blocks
-                            assert!(
-                                gradient.len() > 0,
-                                "Should get at least some blocks for size {} with {:?}/{:?}/{:?}",
-                                size,
-                                color_space,
-                                easing,
-                                sampling
-                            );
-                        }
+                    #[allow(clippy::collapsible_if, clippy::len_zero)]
+                    if size > 0 && !AllBlocks::new().with_color().is_empty() && size <= 10 {
+                        // For reasonable sizes, we should get some blocks
+                        assert!(
+                            !gradient.is_empty(),
+                            "Should get at least some blocks for size {} with {:?}/{:?}/{:?}",
+                            size,
+                            color_space,
+                            easing,
+                            sampling
+                        );
                     }
 
                     // All returned blocks should have color data
@@ -317,11 +317,12 @@ fn test_gradient_size_scaling() {
             size
         );
 
-        if size > 0 && AllBlocks::new().with_color().len() > 0 {
+        #[allow(clippy::len_zero)]
+        if size > 0 && !AllBlocks::new().with_color().is_empty() {
             // For very small gradients, we should get at least something
             if size <= 5 {
                 assert!(
-                    gradient.len() > 0,
+                    !gradient.is_empty(),
                     "Should get at least one block for size {}",
                     size
                 );

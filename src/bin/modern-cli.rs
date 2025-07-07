@@ -157,7 +157,7 @@ fn render_query_builder_tab(f: &mut ratatui::Frame, app: &App, area: Rect) {
         .split(chunks[0]);
 
     // Query operations panel
-    let operations = vec![
+    let operations = [
         "🔍 Query Operations:",
         "",
         "[1] 🏗️  Filter: Only solid blocks",
@@ -497,7 +497,7 @@ fn render_modal(f: &mut ratatui::Frame, app: &App) {
         ModalType::SaveQuery => "Query name (not yet implemented)",
     };
 
-    let content = vec![
+    let content = [
         prompt.to_string(),
         "".to_string(),
         format!("Input: {}_", app.input_buffer),

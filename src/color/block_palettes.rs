@@ -1,6 +1,6 @@
 use super::{palettes::GradientMethod, ExtendedColorData};
-use crate::{BlockFacts, BLOCKS};
-
+use crate::BlockFacts;
+use crate::BLOCKS;
 /// Generate palettes of actual Minecraft blocks based on color relationships
 pub struct BlockPaletteGenerator;
 
@@ -332,6 +332,7 @@ impl BlockFilter {
     }
 }
 
+#[allow(dead_code, clippy::needless_borrow, clippy::explicit_auto_deref)] // API for future use
 impl BlockPaletteGenerator {
     /// Generate a gradient palette of blocks between two blocks with filtering
     pub fn generate_block_gradient(

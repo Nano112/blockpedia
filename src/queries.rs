@@ -17,7 +17,7 @@ pub fn find_blocks_by_property(
                     .map(|values| values.contains(&value))
                     .unwrap_or(false)
         })
-        .map(|block| *block)
+        .copied()
 }
 
 /// Find all blocks that match a predicate function
@@ -27,8 +27,8 @@ where
 {
     BLOCKS
         .values()
-        .filter(move |block| predicate(*block))
-        .map(|block| *block)
+        .filter(move |block| predicate(block))
+        .copied()
 }
 
 /// Search for blocks using a glob-like pattern (supports * wildcard)
@@ -77,7 +77,7 @@ pub fn search_blocks(pattern: &str) -> impl Iterator<Item = &'static BlockFacts>
                 block_id.contains(&pattern)
             }
         })
-        .map(|block| *block)
+        .copied()
 }
 
 /// Get all possible values for a specific property across all blocks
@@ -110,7 +110,7 @@ where
 {
     BLOCKS
         .values()
-        .filter(move |block| predicate(*block))
+        .filter(move |block| predicate(block))
         .count()
 }
 
@@ -197,7 +197,7 @@ pub fn blocks_with_properties(
                 }
             })
         })
-        .map(|block| *block)
+        .copied()
 }
 
 /// Find properties that appear in less than a certain percentage of blocks
@@ -459,7 +459,7 @@ pub fn blocks_with_complex_properties(
                 }
             })
         })
-        .map(|block| *block)
+        .copied()
 }
 
 /// Analyze property correlation - find properties that often appear together

@@ -65,11 +65,11 @@ fn showcase_solid_blocks_filter() {
                 .replace('_', " ");
 
             println!(
-                "     {}. {} {} - {} ({})",
+                "     {}. {} {} - {:?} ({})",
                 i + 1,
                 rec.color.hex_string(),
                 block_name,
-                format!("{:?}", rec.role),
+                rec.role,
                 rec.usage_notes.split('.').next().unwrap_or("General use")
             );
         }
@@ -131,11 +131,11 @@ fn showcase_structural_blocks_filter() {
                 .replace('_', " ");
 
             println!(
-                "     {}. {} {} - {}",
+                "     {}. {} {} - {:?}",
                 i + 1,
                 rec.color.hex_string(),
                 block_name,
-                format!("{:?}", rec.role)
+                rec.role
             );
         }
         println!();
@@ -192,11 +192,11 @@ fn showcase_decorative_blocks_filter() {
                 .replace('_', " ");
 
             println!(
-                "     {}. {} {} - {}",
+                "     {}. {} {} - {:?}",
                 i + 1,
                 rec.color.hex_string(),
                 block_name,
-                format!("{:?}", rec.role)
+                rec.role
             );
         }
         println!();
@@ -214,8 +214,10 @@ fn showcase_custom_filters() {
     println!("===========================\n");
 
     // Example 1: No Water/Lava Filter
-    let mut no_liquids_filter = BlockFilter::default();
-    no_liquids_filter.exclude_patterns = vec!["water".to_string(), "lava".to_string()];
+    let no_liquids_filter = BlockFilter {
+        exclude_patterns: vec!["water".to_string(), "lava".to_string()],
+        ..Default::default()
+    };
 
     println!("🚫 No Liquids Filter:");
     if let Some(ocean_no_liquids) =
@@ -235,8 +237,10 @@ fn showcase_custom_filters() {
     println!();
 
     // Example 2: Only Concrete Blocks
-    let mut concrete_only_filter = BlockFilter::default();
-    concrete_only_filter.include_patterns = vec!["concrete".to_string()];
+    let concrete_only_filter = BlockFilter {
+        include_patterns: vec!["concrete".to_string()],
+        ..Default::default()
+    };
 
     println!("🧱 Concrete Only Filter:");
     if let Some(modern_concrete) = BlockPaletteGenerator::generate_architectural_palette_filtered(
@@ -257,8 +261,10 @@ fn showcase_custom_filters() {
     println!();
 
     // Example 3: No Light Sources for Dark Builds
-    let mut no_light_filter = BlockFilter::default();
-    no_light_filter.exclude_light_sources = true;
+    let no_light_filter = BlockFilter {
+        exclude_light_sources: true,
+        ..Default::default()
+    };
 
     println!("🌑 No Light Sources Filter:");
     if let Some(nether_dark) =

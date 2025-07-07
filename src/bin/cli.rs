@@ -259,7 +259,7 @@ fn render_colors_tab(f: &mut ratatui::Frame, app: &App, area: Rect) {
         .split(area);
 
     // Color query options
-    let color_options = vec![
+    let color_options = [
         "🎨 Color System Features",
         "",
         "[1] 📊 Color Coverage Analysis - See how many blocks have color data",
@@ -405,7 +405,7 @@ fn render_statistics_tab(f: &mut ratatui::Frame, _app: &App, area: Rect) {
 
     // Basic stats
     let stats = get_property_stats();
-    let stats_text = vec![
+    let stats_text = [
         format!("Total blocks: {}", BLOCKS.len()),
         format!("Unique properties: {}", stats.total_unique_properties),
         format!(
@@ -462,25 +462,22 @@ fn handle_blocks_input(key: crossterm::event::KeyEvent, app: &mut App) {
 fn handle_query_input(key: crossterm::event::KeyEvent, app: &mut App) {
     // Handle input mode first
     match app.input_mode {
-        InputMode::Searching => {
-            match key.code {
-                KeyCode::Enter => {
-                    app.execute_search();
-                }
-                KeyCode::Esc => {
-                    app.input_mode = InputMode::Normal;
-                    app.search_query.clear();
-                }
-                KeyCode::Backspace => {
-                    app.search_query.pop();
-                }
-                KeyCode::Char(c) => {
-                    app.search_query.push(c);
-                }
-                _ => {}
+        InputMode::Searching => match key.code {
+            KeyCode::Enter => {
+                app.execute_search();
             }
-            return;
-        }
+            KeyCode::Esc => {
+                app.input_mode = InputMode::Normal;
+                app.search_query.clear();
+            }
+            KeyCode::Backspace => {
+                app.search_query.pop();
+            }
+            KeyCode::Char(c) => {
+                app.search_query.push(c);
+            }
+            _ => {}
+        },
         InputMode::Normal => {
             match key.code {
                 // New search hotkeys
@@ -506,11 +503,8 @@ fn handle_query_input(key: crossterm::event::KeyEvent, app: &mut App) {
         }
         InputMode::QueryBuilding => {
             // TODO: Implement advanced query builder interface
-            match key.code {
-                KeyCode::Esc => {
-                    app.input_mode = InputMode::Normal;
-                }
-                _ => {}
+            if key.code == KeyCode::Esc {
+                app.input_mode = InputMode::Normal;
             }
         }
     }
@@ -576,6 +570,7 @@ enum SearchMode {
 enum InputMode {
     Normal,
     Searching,
+    #[allow(dead_code)]
     QueryBuilding,
 }
 
@@ -584,14 +579,19 @@ struct QueryBuilder {
     property_filters: Vec<PropertyFilter>,
     color_filter: Option<ColorFilter>,
     name_pattern: String,
+    #[allow(dead_code)]
     current_field: QueryField,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 enum QueryField {
+    #[default]
     NamePattern,
+    #[allow(dead_code)]
     PropertyName,
+    #[allow(dead_code)]
     PropertyValue,
+    #[allow(dead_code)]
     ColorHex,
 }
 
@@ -604,9 +604,13 @@ struct PropertyFilter {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum FilterOperator {
+    #[allow(dead_code)]
     Equals,
+    #[allow(dead_code)]
     Contains,
+    #[allow(dead_code)]
     NotEquals,
+    #[allow(dead_code)]
     Exists,
 }
 
@@ -614,12 +618,6 @@ enum FilterOperator {
 struct ColorFilter {
     hex_color: String,
     tolerance: f32,
-}
-
-impl Default for QueryField {
-    fn default() -> Self {
-        QueryField::NamePattern
-    }
 }
 
 impl App {
@@ -1178,11 +1176,11 @@ impl App {
                     .strip_prefix("minecraft:")
                     .unwrap_or(rec.block.id());
                 self.query_results.push(format!(
-                    "  {}. {} {} ({})",
+                    "  {}. {} {} ({:?})",
                     i + 1,
                     rec.color.hex_string(),
                     block_name.replace('_', " "),
-                    format!("{:?}", rec.role)
+                    rec.role
                 ));
             }
         }
@@ -1228,7 +1226,7 @@ impl App {
                 ));
                 self.query_results.push(palette.description);
 
-                for (_i, rec) in palette.blocks.iter().take(4).enumerate() {
+                for rec in palette.blocks.iter().take(4) {
                     let block_name = rec
                         .block
                         .id()
@@ -1500,26 +1498,17 @@ impl App {
         // Apply name pattern filter
         if !self.query_builder.name_pattern.is_empty() {
             let pattern = self.query_builder.name_pattern.to_lowercase();
-            results = results
-                .into_iter()
-                .filter(|block| block.id().to_lowercase().contains(&pattern))
-                .collect();
+            results.retain(|block| block.id().to_lowercase().contains(&pattern));
         }
 
         // Apply property filters
         for filter in &self.query_builder.property_filters {
-            results = results
-                .into_iter()
-                .filter(|block| self.apply_property_filter(block, filter))
-                .collect();
+            results.retain(|block| self.apply_property_filter(block, filter));
         }
 
         // Apply color filter
         if let Some(color_filter) = &self.query_builder.color_filter {
-            results = results
-                .into_iter()
-                .filter(|block| self.apply_color_filter(block, color_filter))
-                .collect();
+            results.retain(|block| self.apply_color_filter(block, color_filter));
         }
 
         self.filtered_blocks = results.into_iter().cloned().collect();
@@ -1709,7 +1698,7 @@ fn render_sources_tab(f: &mut ratatui::Frame, _app: &App, area: Rect) {
         .split(area);
 
     // Data source information
-    let source_info = vec![
+    let source_info = [
         "🌐 Data Source Management",
         "",
         "Current build was compiled with data from one of these sources:",

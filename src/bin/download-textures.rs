@@ -84,7 +84,7 @@ async fn main() -> Result<()> {
         // Quick color extraction test
         println!();
         println!("🎨 Testing color extraction on a few textures...");
-        test_color_extraction(&textures_dir).await?;
+        test_color_extraction(textures_dir).await?;
     }
 
     Ok(())

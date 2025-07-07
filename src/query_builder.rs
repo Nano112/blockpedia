@@ -79,6 +79,7 @@ pub struct AllBlocks;
 
 impl AllBlocks {
     /// Start a new block query with all available blocks
+    #[allow(clippy::new_ret_no_self)] // AllBlocks is just a namespace
     pub fn new() -> BlockQuery {
         BlockQuery {
             blocks: BLOCKS.values().copied().collect(),
@@ -656,6 +657,7 @@ impl BlockQuery {
         }
     }
 
+    #[allow(dead_code)] // Helper method for future use
     fn format_block_name(id: &str) -> String {
         id.strip_prefix("minecraft:")
             .unwrap_or(id)
@@ -733,6 +735,7 @@ impl BlockQuery {
         result
     }
 
+    #[allow(dead_code)] // Helper method for future use
     fn find_closest_color_block(
         &self,
         target_color: &ExtendedColorData,
@@ -895,9 +898,10 @@ impl BlockQuery {
         ]
     }
 
+    #[allow(clippy::manual_clamp, clippy::excessive_precision)] // Scientific precision required
     fn oklab_to_rgb(oklab: [f32; 3]) -> [u8; 3] {
         // Simplified Oklab to RGB conversion
-        let l = oklab[0].max(0.0).min(1.0);
+        let l = oklab[0].clamp(0.0, 1.0);
         let a = oklab[1];
         let b = oklab[2];
 
@@ -965,9 +969,9 @@ impl BlockQuery {
         b_val = gamma_correct(b_val / 100.0);
 
         // Clamp to [0, 1] and convert to [0, 255]
-        let r = (r.max(0.0).min(1.0) * 255.0) as u8;
-        let g = (g.max(0.0).min(1.0) * 255.0) as u8;
-        let b = (b_val.max(0.0).min(1.0) * 255.0) as u8;
+        let r = (r.clamp(0.0, 1.0) * 255.0) as u8;
+        let g = (g.clamp(0.0, 1.0) * 255.0) as u8;
+        let b = (b_val.clamp(0.0, 1.0) * 255.0) as u8;
 
         [r, g, b]
     }
