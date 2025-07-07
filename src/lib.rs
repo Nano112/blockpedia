@@ -242,6 +242,12 @@ pub use query_builder::{
     AllBlocks, BlockQuery, ColorSamplingMethod, ColorSpace, EasingFunction, GradientConfig,
 };
 
+// Block transformation module for rotation and variants
+pub mod transforms;
+pub use transforms::{
+    BlockTransforms, Direction, Rotation, BlockShape,
+};
+
 /// Get a block by its string ID
 pub fn get_block(id: &str) -> Option<&'static BlockFacts> {
     BLOCKS.get(id).copied()

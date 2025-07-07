@@ -27,6 +27,13 @@ Blockpedia provides programmatic access to Minecraft block information, includin
 - **Smart Queries**: Advanced search and filtering capabilities
 - **Type-Safe API**: Robust error handling and validation
 
+### 🔄 **Block Transforms**
+- **Rotation Operations**: Clockwise, 180°, and counter-clockwise rotation with property preservation
+- **Material Variants**: Convert between materials while preserving shapes (oak_stairs → stone_stairs)
+- **Shape Variants**: Convert between shapes while preserving materials (stone → stone_stairs)
+- **Smart Orientation**: Automatically orient directional blocks (facing, axis properties)
+- **Variant Discovery**: Find all available materials and shapes for any block
+
 ### 🖥️ **Interactive CLI**
 - **6 Specialized Tabs**: Blocks, Colors, Query, Properties, Statistics, Sources
 - **Real-time Search**: Live filtering by name, property, or color
@@ -219,6 +226,42 @@ let similar_blocks: Vec<_> = BLOCKS.values()
         }
     })
     .collect();
+```
+
+### Block Transforms
+
+```rust
+use blockpedia::{BlockState, transforms::{Direction, BlockShape}};
+
+// Rotation operations
+let repeater = BlockState::parse("minecraft:repeater[facing=north,delay=2]")?;
+let rotated = repeater.rotate_clockwise()?;  // Now faces east
+let rotated_180 = repeater.rotate_180()?;    // Now faces south
+let rotated_ccw = repeater.rotate_counter_clockwise()?; // Now faces west
+
+// Material variants - preserve shape and properties
+let oak_stairs = BlockState::parse("minecraft:oak_stairs[facing=north,half=top]")?;
+let stone_stairs = oak_stairs.with_material("stone")?; // minecraft:stone_stairs[facing=north,half=top]
+
+// Shape variants - preserve material and compatible properties  
+let stone_block = BlockState::new("minecraft:stone")?;
+let stone_stairs = stone_block.with_shape(BlockShape::Stairs)?; // minecraft:stone_stairs[facing=north,half=bottom,shape=straight]
+let stone_slab = stone_block.with_shape(BlockShape::Slab)?;     // minecraft:stone_slab[type=bottom]
+
+// Discover available variants
+let oak_stairs = BlockState::new("minecraft:oak_stairs")?;
+let materials = oak_stairs.available_materials()?; // ["acacia", "andesite", "bamboo", ...]
+let shapes = oak_stairs.available_shapes()?;       // [Stairs, Slab, Full, Wall, Fence, ...]
+
+// Complex transformations
+let complex_stairs = BlockState::parse("minecraft:oak_stairs[facing=west,half=top,shape=inner_left]")?;
+let rotated_stone = complex_stairs
+    .rotate_clockwise()?           // facing=north, shape=inner_right
+    .with_material("stone_brick")?; // minecraft:stone_brick_stairs[facing=north,half=top,shape=inner_right]
+
+// Axis rotation for logs and pillars
+let log = BlockState::parse("minecraft:oak_log[axis=x]")?;
+let rotated_log = log.rotate_clockwise()?; // axis=z
 ```
 
 ## 🎨 Color System
