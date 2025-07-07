@@ -1,6 +1,6 @@
 [package]
 name = "blockpedia"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 rust-version = "1.82"
 authors = ["Nano nano@schem.at"]
@@ -49,6 +49,11 @@ path = "src/bin/missing-colors.rs"
 name = "test-cli-colors"
 path = "src/bin/test-cli-colors.rs"
 
+[[bin]]
+name = "build-data"
+path = "src/bin/build-data.rs"
+required-features = ["build-data"]
+
 [dependencies]
 # Core library dependencies
 phf = { version = "0.11", features = ["macros"] }
@@ -66,7 +71,7 @@ crossterm = { version = "0.27", optional = true }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # CLI utilities need network access for downloading textures
 tokio = { version = "1.0", features = ["rt", "rt-multi-thread", "macros", "time"], optional = true }
-reqwest = { version = "0.12", features = ["json"], optional = true }
+reqwest = { version = "0.12", features = ["blocking", "json"], optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # WASM-compatible tokio features
@@ -83,16 +88,24 @@ serde-wasm-bindgen = { version = "0.6", optional = true }
 phf_codegen = "0.11"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-reqwest = { version = "0.12", features = ["blocking", "json"] }
 anyhow = "1.0"
-tokio = { version = "1.0", features = ["rt", "rt-multi-thread"] }
 image = "0.24"
+# Optional dependencies for build-time data fetching
+reqwest = { version = "0.12", features = ["blocking", "json"], optional = true }
+tokio = { version = "1.0", features = ["rt", "rt-multi-thread"], optional = true }
+
+# Make reqwest available for the bin as well
+[target.'cfg(not(target_arch = "wasm32"))'.build-dependencies]
+reqwest = { version = "0.12", features = ["blocking", "json"], optional = true }
 
 [features]
 default = ["tui"]
-tui = ["ratatui", "crossterm"]
-network = ["tokio", "reqwest"]
-wasm = ["wasm-bindgen", "web-sys", "js-sys", "console_error_panic_hook", "wee_alloc", "serde-wasm-bindgen"]
+tui = ["dep:ratatui", "dep:crossterm"]
+network = ["dep:tokio", "dep:reqwest"]
+wasm = ["dep:wasm-bindgen", "dep:web-sys", "dep:js-sys", "dep:console_error_panic_hook", "dep:wee_alloc", "dep:serde-wasm-bindgen"]
+# Build-time features
+build-data = ["dep:reqwest", "dep:tokio"]  # Enable downloading data during build
+use-prebuilt = []  # Use pre-built static data files
 
 [dev-dependencies]
 proptest = "1.4"

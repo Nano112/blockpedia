@@ -417,6 +417,7 @@ mod data_sources_build {
         }
     }
 
+    #[cfg(feature = "build-data")]
     fn download_from_url(url: &str) -> Result<String> {
         let response = reqwest::blocking::get(url).context("Failed to make HTTP request")?;
 
@@ -428,9 +429,49 @@ mod data_sources_build {
             .text()
             .context("Failed to read response body as text")
     }
+    
+    #[cfg(not(feature = "build-data"))]
+    fn download_from_url(_url: &str) -> Result<String> {
+        anyhow::bail!("Network downloads disabled - build-data feature not enabled")
+    }
 }
 
 use data_sources_build::*;
+
+/// Use pre-built data files instead of downloading
+fn use_prebuilt_data(out_dir: &str) -> Result<()> {
+    let data_dir = Path::new("data");
+    
+    // Check if pre-built data exists
+    let prismarinejs_file = data_dir.join("prismarinejs_blocks.json");
+    let mcproperty_file = data_dir.join("mcproperty_blocks.json");
+    
+    if !prismarinejs_file.exists() && !mcproperty_file.exists() {
+        anyhow::bail!("No pre-built data files found in ./data/ directory. Run 'cargo run --bin build-data --features build-data' to generate them.");
+    }
+    
+    // Use PrismarineJS data if available, otherwise MCProperty
+    let data_file = if prismarinejs_file.exists() {
+        println!("cargo:warning=Using pre-built PrismarineJS data");
+        prismarinejs_file
+    } else {
+        println!("cargo:warning=Using pre-built MCPropertyEncyclopedia data");
+        mcproperty_file
+    };
+    
+    // Load and parse the pre-built data
+    let json_data = fs::read_to_string(&data_file)
+        .with_context(|| format!("Failed to read pre-built data from {:?}", data_file))?;
+    
+    let parsed: Value = serde_json::from_str(&json_data)
+        .context("Failed to parse pre-built JSON data")?;
+    
+    // Generate PHF table using legacy method for now
+    generate_legacy_phf_table(out_dir, &parsed)?;
+    
+    println!("cargo:warning=Successfully built blockpedia using pre-built data");
+    Ok(())
+}
 
 const BLOCKS_DATA_URL: &str = "https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/1.20.4/blocks.json";
 
@@ -1086,6 +1127,24 @@ fn get_block_ids_from_json(json: &Value) -> Result<Vec<String>> {
 fn main() -> Result<()> {
     let out_dir = env::var("OUT_DIR").unwrap();
 
+    // Check if we should use pre-built data
+    if cfg!(feature = "use-prebuilt") || env::var("BLOCKPEDIA_USE_PREBUILT").is_ok() {
+        println!("cargo:warning=Using pre-built data files");
+        return use_prebuilt_data(&out_dir);
+    }
+
+    // Check if we can download data (build-data feature available)
+    #[cfg(not(feature = "build-data"))]
+    {
+        println!("cargo:warning=Network downloads disabled (build-data feature not enabled)");
+        println!("cargo:warning=Checking for pre-built data as fallback...");
+        if let Ok(()) = use_prebuilt_data(&out_dir) {
+            return Ok(());
+        } else {
+            anyhow::bail!("No pre-built data available and network downloads disabled. Run 'cargo run --bin build-data --features build-data' to generate data files.");
+        }
+    }
+
     // Set up data source registry
     let mut data_registry = DataSourceRegistry::default();
 
@@ -1200,6 +1259,7 @@ fn fetch_or_load_cached(cache_path: &Path) -> Result<String> {
     }
 }
 
+#[cfg(feature = "build-data")]
 fn download_json() -> Result<String> {
     let response =
         reqwest::blocking::get(BLOCKS_DATA_URL).context("Failed to make HTTP request")?;
@@ -1211,6 +1271,11 @@ fn download_json() -> Result<String> {
     response
         .text()
         .context("Failed to read response body as text")
+}
+
+#[cfg(not(feature = "build-data"))]
+fn download_json() -> Result<String> {
+    anyhow::bail!("Network downloads disabled - build-data feature not enabled")
 }
 
 fn validate_json_structure(json: &Value) -> Result<()> {
