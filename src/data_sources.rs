@@ -8,7 +8,11 @@ pub struct UnifiedBlockData {
     pub id: String,
     pub properties: HashMap<String, Vec<String>>,
     pub default_state: HashMap<String, String>,
+    pub transparent: bool,
     pub extra_properties: HashMap<String, Value>, // For source-specific data
+    pub bedrock_id: Option<String>,
+    pub bedrock_properties: Option<HashMap<String, Vec<String>>>,
+    pub bedrock_default_state: Option<HashMap<String, String>>,
 }
 
 /// Trait for different data source adapters
@@ -98,7 +102,11 @@ impl DataSourceAdapter for PrismarineAdapter {
                 id,
                 properties,
                 default_state: HashMap::new(), // PrismarineJS doesn't provide default states
+                transparent: false, // Default to false, can be updated from other sources
                 extra_properties,
+                bedrock_id: None,
+                bedrock_properties: None,
+                bedrock_default_state: None,
             });
         }
 
@@ -186,7 +194,11 @@ impl DataSourceAdapter for MCPropertyEncyclopediaAdapter {
                 id,
                 properties: HashMap::new(), // MCPropertyEncyclopedia doesn't have block states
                 default_state: HashMap::new(),
+                transparent: false,
                 extra_properties,
+                bedrock_id: None,
+                bedrock_properties: None,
+                bedrock_default_state: None,
             });
         }
 
@@ -203,6 +215,109 @@ impl DataSourceAdapter for MCPropertyEncyclopediaAdapter {
             .get("properties")
             .and_then(|p| p.as_object())
             .context("Missing or invalid properties")?;
+
+        Ok(())
+    }
+}
+
+/// Bedrock Edition data source adapter (from PrismarineJS)
+pub struct BedrockDataAdapter;
+
+impl DataSourceAdapter for BedrockDataAdapter {
+    fn name(&self) -> &'static str {
+        "BedrockData"
+    }
+
+    fn fetch_url(&self) -> &'static str {
+        "https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/bedrock/1.21.0/blocks.json"
+    }
+
+    fn parse_data(&self, json_data: &str) -> Result<Vec<UnifiedBlockData>> {
+        let parsed: Value =
+            serde_json::from_str(json_data).context("Failed to parse Bedrock data JSON")?;
+
+        let blocks_array = parsed
+            .as_array()
+            .context("Bedrock data JSON is not an array")?;
+
+        let mut unified_blocks = Vec::new();
+
+        for block in blocks_array {
+            let block_obj = block.as_object().context("Block is not an object")?;
+
+            let name = block_obj
+                .get("name")
+                .and_then(|n| n.as_str())
+                .context("Block missing name field")?;
+
+            let id = format!("minecraft:{}", name);
+
+            // Convert states to properties
+            let mut properties = HashMap::new();
+            if let Some(states) = block_obj.get("states").and_then(|s| s.as_array()) {
+                for state in states {
+                    if let Some(state_obj) = state.as_object() {
+                        if let (Some(prop_name), Some(prop_type), Some(num_values)) = (
+                            state_obj.get("name").and_then(|n| n.as_str()),
+                            state_obj.get("type").and_then(|t| t.as_str()),
+                            state_obj.get("num_values").and_then(|n| n.as_u64()),
+                        ) {
+                            let values = match prop_type {
+                                "bool" => vec!["false".to_string(), "true".to_string()],
+                                "int" => (0..num_values).map(|i| i.to_string()).collect(),
+                                "enum" => {
+                                    if let Some(values_array) =
+                                        state_obj.get("values").and_then(|v| v.as_array())
+                                    {
+                                        values_array
+                                            .iter()
+                                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                            .collect()
+                                    } else {
+                                        (0..num_values).map(|i| format!("value_{}", i)).collect()
+                                    }
+                                }
+                                _ => vec!["unknown".to_string()],
+                            };
+                            properties.insert(prop_name.to_string(), values);
+                        }
+                    }
+                }
+            }
+
+            let transparent = block_obj
+                .get("transparent")
+                .and_then(|t| t.as_bool())
+                .unwrap_or(false);
+
+            let mut extra_properties = HashMap::new();
+            if let Some(hardness) = block_obj.get("hardness") {
+                extra_properties.insert("hardness".to_string(), hardness.clone());
+            }
+
+            unified_blocks.push(UnifiedBlockData {
+                id: id.clone(),
+                properties: properties.clone(),
+                default_state: HashMap::new(), // We'll need to figure this out or map it
+                transparent,
+                extra_properties,
+                bedrock_id: Some(id),
+                bedrock_properties: Some(properties),
+                bedrock_default_state: Some(HashMap::new()),
+            });
+        }
+
+        Ok(unified_blocks)
+    }
+
+    fn validate_structure(&self, json: &Value) -> Result<()> {
+        let blocks_array = json
+            .as_array()
+            .context("Bedrock data JSON is not a valid array")?;
+
+        if blocks_array.is_empty() {
+            anyhow::bail!("No blocks found in Bedrock data");
+        }
 
         Ok(())
     }
@@ -266,6 +381,7 @@ impl Default for DataSourceRegistry {
         // Register default sources
         registry.register_source(Box::new(PrismarineAdapter));
         registry.register_source(Box::new(MCPropertyEncyclopediaAdapter));
+        registry.register_source(Box::new(BedrockDataAdapter));
 
         registry
     }

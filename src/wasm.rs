@@ -32,7 +32,6 @@ macro_rules! log {
 }
 
 #[cfg(all(feature = "wasm", target_arch = "wasm32"))]
-#[wasm_bindgen(start)]
 pub fn init() {
     console_error_panic_hook::set_once();
 

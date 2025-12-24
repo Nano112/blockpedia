@@ -6,6 +6,7 @@ pub struct BlockFacts {
     pub id: &'static str,
     pub properties: &'static [(&'static str, &'static [&'static str])],
     pub default_state: &'static [(&'static str, &'static str)],
+    pub transparent: bool,
     pub extras: Extras,
 }
 
@@ -14,6 +15,14 @@ pub struct Extras {
     // Future extension point for fetcher data
     pub mock_data: Option<i32>,
     pub color: Option<ColorData>,
+    pub bedrock: Option<BedrockData>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct BedrockData {
+    pub id: &'static str,
+    pub properties: &'static [(&'static str, &'static [&'static str])],
+    pub default_state: &'static [(&'static str, &'static str)],
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -43,6 +52,7 @@ impl Extras {
         Extras {
             mock_data: None,
             color: None,
+            bedrock: None,
         }
     }
 }
@@ -89,6 +99,18 @@ impl BlockFacts {
 }
 
 impl BlockState {
+    pub fn id(&self) -> &str {
+        &self.block_id
+    }
+
+    pub fn get_property(&self, property: &str) -> Option<&str> {
+        self.properties.get(property).map(|s| s.as_str())
+    }
+
+    pub fn properties(&self) -> &HashMap<String, String> {
+        &self.properties
+    }
+
     pub fn new(block_id: &str) -> Result<Self> {
         // Validate block ID format first
         errors::validation::validate_block_id(block_id)?;
@@ -160,6 +182,47 @@ impl BlockState {
         Ok(state)
     }
 
+    /// Parse a blockstate string without validation (for Bedrock blockstates)
+    fn parse_unvalidated(blockstate_str: &str) -> Result<Self> {
+        if let Some(bracket_pos) = blockstate_str.find('[') {
+            let block_id = &blockstate_str[..bracket_pos];
+            let properties_str = &blockstate_str[bracket_pos + 1..];
+
+            if !properties_str.ends_with(']') {
+                return Err(BlockpediaError::parse_failed(
+                    blockstate_str,
+                    "missing closing bracket",
+                ));
+            }
+
+            let properties_str = &properties_str[..properties_str.len() - 1];
+            let mut properties = HashMap::new();
+
+            if !properties_str.is_empty() {
+                for prop_pair in properties_str.split(',') {
+                    let parts: Vec<&str> = prop_pair.split('=').collect();
+                    if parts.len() != 2 {
+                        return Err(BlockpediaError::parse_failed(
+                            blockstate_str,
+                            &format!("invalid property format: {}", prop_pair),
+                        ));
+                    }
+                    properties.insert(parts[0].trim().to_string(), parts[1].trim().to_string());
+                }
+            }
+
+            Ok(BlockState {
+                block_id: block_id.to_string(),
+                properties,
+            })
+        } else {
+            Ok(BlockState {
+                block_id: blockstate_str.to_string(),
+                properties: HashMap::new(),
+            })
+        }
+    }
+
     /// Parse a blockstate string like "minecraft:repeater[delay=3,facing=north]"
     pub fn parse(blockstate_str: &str) -> Result<Self> {
         if let Some(bracket_pos) = blockstate_str.find('[') {
@@ -196,6 +259,85 @@ impl BlockState {
             BlockState::new(blockstate_str)
         }
     }
+
+    /// Convert this Java BlockState to a Bedrock BlockState using dynamic mappings
+    pub fn to_bedrock(&self) -> Result<BlockState> {
+        // Get the block facts to fill in default properties
+        let facts = BLOCKS
+            .get(&self.block_id)
+            .ok_or_else(|| BlockpediaError::block_not_found(&self.block_id))?;
+        
+        // Build a complete blockstate with all properties (including defaults)
+        let mut complete_properties = HashMap::new();
+        
+        // First, add all default properties from default_state
+        for (name, value) in facts.default_state {
+            complete_properties.insert(name.to_string(), value.to_string());
+        }
+        
+        // For any properties that don't have defaults, use the first allowed value
+        for (name, values) in facts.properties {
+            if !complete_properties.contains_key(*name) && !values.is_empty() {
+                complete_properties.insert(name.to_string(), values[0].to_string());
+            }
+        }
+        
+        // Then, override with any explicitly set properties
+        for (name, value) in &self.properties {
+            complete_properties.insert(name.clone(), value.clone());
+        }
+        
+        // Build the Java blockstate string with all properties
+        let mut props = Vec::new();
+        for (key, value) in &complete_properties {
+            props.push(format!("{}={}", key, value));
+        }
+        props.sort(); // Normalize property order
+        let java_blockstate = if props.is_empty() {
+            format!("{}[]", self.block_id)
+        } else {
+            format!("{}[{}]", self.block_id, props.join(","))
+        };
+        
+        // Look up the Bedrock blockstate string in the mapping
+        let bedrock_blockstate = bedrock_mapping::BedrockBlockStateMapper::java_to_bedrock(&java_blockstate)
+            .ok_or_else(|| {
+                BlockpediaError::custom(format!(
+                    "No Bedrock mapping found for Java blockstate: {}",
+                    java_blockstate
+                ))
+            })?;
+        
+        // Parse the Bedrock blockstate string (without validation since it's Bedrock format)
+        Self::parse_unvalidated(bedrock_blockstate)
+    }
+
+    /// Create a Java BlockState from a Bedrock BlockState using dynamic mappings
+    pub fn from_bedrock(bedrock_id: &str, properties: HashMap<String, String>) -> Result<Self> {
+        // Build the Bedrock blockstate string
+        let mut props = Vec::new();
+        for (key, value) in &properties {
+            props.push(format!("{}={}", key, value));
+        }
+        props.sort(); // Normalize property order
+        let bedrock_blockstate = if props.is_empty() {
+            format!("{}[]", bedrock_id)
+        } else {
+            format!("{}[{}]", bedrock_id, props.join(","))
+        };
+        
+        // Look up the Java blockstate string in the mapping
+        let java_blockstate = bedrock_mapping::BedrockBlockStateMapper::bedrock_to_java(&bedrock_blockstate)
+            .ok_or_else(|| {
+                BlockpediaError::custom(format!(
+                    "No Java mapping found for Bedrock blockstate: {}",
+                    bedrock_blockstate
+                ))
+            })?;
+        
+        // Parse the Java blockstate string (with validation since it's Java format)
+        BlockState::parse(java_blockstate)
+    }
 }
 
 impl std::fmt::Display for BlockState {
@@ -212,6 +354,9 @@ impl std::fmt::Display for BlockState {
         }
     }
 }
+
+// Bedrock mapping module
+pub mod bedrock_mapping;
 
 // Include the generated block table
 include!(concat!(env!("OUT_DIR"), "/block_table.rs"));

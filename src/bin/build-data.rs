@@ -29,6 +29,10 @@ fn main() -> Result<()> {
     println!("Downloading MCPropertyEncyclopedia data...");
     download_mcproperty_data(output_dir)?;
     
+    // Download Bedrock data
+    println!("Downloading Bedrock Edition data...");
+    download_bedrock_data(output_dir)?;
+    
     println!("Data build complete! Files saved to ./data/");
     println!("You can now build blockpedia with the 'use-prebuilt' feature.");
     
@@ -93,6 +97,38 @@ fn download_mcproperty_data(output_dir: &Path) -> Result<()> {
     let output_file = output_dir.join("mcproperty_blocks.json");
     fs::write(&output_file, &data)
         .with_context(|| format!("Failed to write to {:?}", output_file))?;
+    
+    Ok(())
+}
+
+fn download_bedrock_data(output_dir: &Path) -> Result<()> {
+    // 1. Download blocks.json (for metadata like transparency)
+    let url_blocks = "https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/bedrock/1.21.0/blocks.json";
+    let response_blocks = reqwest::blocking::get(url_blocks).context("Failed to download Bedrock blocks.json")?;
+    let data_blocks = response_blocks.text().context("Failed to read blocks.json response")?;
+    fs::write(output_dir.join("bedrock_blocks.json"), &data_blocks)?;
+    println!("✓ Downloaded Bedrock blocks.json");
+
+    // 2. Download blockStates.json (for properties and values)
+    let url_states = "https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/bedrock/1.21.0/blockStates.json";
+    let response_states = reqwest::blocking::get(url_states).context("Failed to download Bedrock blockStates.json")?;
+    let data_states = response_states.text().context("Failed to read blockStates.json response")?;
+    fs::write(output_dir.join("bedrock_block_states.json"), &data_states)?;
+    println!("✓ Downloaded Bedrock blockStates.json");
+
+    // 3. Download Java -> Bedrock mapping (blocksJ2B.json)
+    let url_j2b = "https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/bedrock/1.21.0/blocksJ2B.json";
+    let response_j2b = reqwest::blocking::get(url_j2b).context("Failed to download Bedrock blocksJ2B.json")?;
+    let data_j2b = response_j2b.text().context("Failed to read blocksJ2B.json response")?;
+    fs::write(output_dir.join("bedrock_blocks_j2b.json"), &data_j2b)?;
+    println!("✓ Downloaded Bedrock blocksJ2B.json");
+
+    // 4. Download Bedrock -> Java mapping (blocksB2J.json)
+    let url_b2j = "https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/bedrock/1.21.0/blocksB2J.json";
+    let response_b2j = reqwest::blocking::get(url_b2j).context("Failed to download Bedrock blocksB2J.json")?;
+    let data_b2j = response_b2j.text().context("Failed to read blocksB2J.json response")?;
+    fs::write(output_dir.join("bedrock_blocks_b2j.json"), &data_b2j)?;
+    println!("✓ Downloaded Bedrock blocksB2J.json");
     
     Ok(())
 }

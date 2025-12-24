@@ -374,6 +374,10 @@ impl BlockpediaError {
             expected_format: expected.to_string(),
         })
     }
+
+    pub fn custom(message: String) -> Self {
+        BlockpediaError::Data(DataError::JsonParse(message))
+    }
 }
 
 /// Error recovery utilities

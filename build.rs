@@ -18,8 +18,12 @@ mod data_sources_build {
         pub id: String,
         pub properties: HashMap<String, Vec<String>>,
         pub default_state: HashMap<String, String>,
+        pub transparent: bool,
         #[allow(dead_code)] // Used for future extensions
         pub extra_properties: HashMap<String, Value>,
+        pub bedrock_id: Option<String>,
+        pub bedrock_properties: Option<HashMap<String, Vec<String>>>,
+        pub bedrock_default_state: Option<HashMap<String, String>>,
     }
 
     /// Trait for different data source adapters in build script
@@ -106,6 +110,11 @@ mod data_sources_build {
                     }
                 }
 
+                let transparent = block_obj
+                    .get("transparent")
+                    .and_then(|t| t.as_bool())
+                    .unwrap_or(false);
+
                 // Extract extra properties from original data
                 let mut extra_properties = HashMap::new();
                 if let Some(hardness) = block_obj.get("hardness") {
@@ -119,7 +128,11 @@ mod data_sources_build {
                     id,
                     properties,
                     default_state: HashMap::new(), // PrismarineJS doesn't provide default states
+                    transparent,
                     extra_properties,
+                    bedrock_id: None,
+                    bedrock_properties: None,
+                    bedrock_default_state: None,
                 });
             }
 
@@ -210,7 +223,11 @@ mod data_sources_build {
                     id,
                     properties: HashMap::new(), // MCPropertyEncyclopedia doesn't have block states
                     default_state: HashMap::new(),
+                    transparent: false,
                     extra_properties,
+                    bedrock_id: None,
+                    bedrock_properties: None,
+                    bedrock_default_state: None,
                 });
             }
 
@@ -227,6 +244,91 @@ mod data_sources_build {
                 .get("properties")
                 .and_then(|p| p.as_object())
                 .context("Missing or invalid properties")?;
+
+            Ok(())
+        }
+    }
+
+    /// Bedrock Edition adapter for build script
+    pub struct BedrockDataAdapter;
+
+    impl DataSourceAdapter for BedrockDataAdapter {
+        fn name(&self) -> &'static str {
+            "BedrockBlockStates"
+        }
+
+        fn fetch_url(&self) -> &'static str {
+            // We'll use blockStates.json as primary for properties
+            "https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/bedrock/1.21.0/blockStates.json"
+        }
+
+        fn parse_data(&self, json_data: &str) -> Result<Vec<UnifiedBlockData>> {
+            let parsed: Value =
+                serde_json::from_str(json_data).context("Failed to parse Bedrock blockStates.json")?;
+
+            let states_array = parsed
+                .as_array()
+                .context("Bedrock blockStates.json is not an array")?;
+
+            let mut block_info_map: HashMap<String, (HashMap<String, Vec<String>>, HashMap<String, String>)> = HashMap::new();
+
+            for state_entry in states_array {
+                if let Some(state_obj) = state_entry.as_object() {
+                    if let Some(name) = state_obj.get("name").and_then(|n| n.as_str()) {
+                        let info = block_info_map.entry(name.to_string()).or_insert_with(|| (HashMap::new(), HashMap::new()));
+                        
+                        if let Some(states) = state_obj.get("states").and_then(|s| s.as_object()) {
+                            for (prop_name, prop_val_obj) in states {
+                                if let Some(val) = prop_val_obj.get("value") {
+                                    let val_str = match val {
+                                        Value::Bool(b) => b.to_string(),
+                                        Value::Number(n) => n.to_string(),
+                                        Value::String(s) => s.clone(),
+                                        _ => continue,
+                                    };
+                                    
+                                    // Add to unique values for this property
+                                    let values = info.0.entry(prop_name.clone()).or_insert_with(Vec::new);
+                                    if !values.contains(&val_str) {
+                                        values.push(val_str.clone());
+                                    }
+                                    
+                                    // First seen value becomes the default (heuristic)
+                                    info.1.entry(prop_name.clone()).or_insert(val_str.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            let mut unified_blocks = Vec::new();
+            for (name, (properties, default_state)) in block_info_map {
+                let id = format!("minecraft:{}", name);
+                unified_blocks.push(UnifiedBlockData {
+                    id: id.clone(),
+                    properties: properties.clone(),
+                    default_state: default_state.clone(),
+                    transparent: false, // Default, will be updated by metadata if available
+                    extra_properties: HashMap::new(),
+                    bedrock_id: Some(id),
+                    bedrock_properties: Some(properties),
+                    bedrock_default_state: Some(default_state),
+                });
+            }
+
+            println!("cargo:warning=DEBUG: BedrockDataAdapter parsed {} unique blocks", unified_blocks.len());
+            Ok(unified_blocks)
+        }
+
+        fn validate_structure(&self, json: &Value) -> Result<()> {
+            let states_array = json
+                .as_array()
+                .context("Bedrock data JSON is not a valid array")?;
+
+            if states_array.is_empty() {
+                anyhow::bail!("No states found in Bedrock blockStates data");
+            }
 
             Ok(())
         }
@@ -278,11 +380,58 @@ mod data_sources_build {
             let primary = self.get_primary_source()?;
 
             // Try to fetch from primary source with cache and fallback
-            match self.fetch_with_fallback(primary) {
-                Ok(blocks) => Ok(blocks),
+            let mut blocks = match self.fetch_with_fallback(primary) {
+                Ok(blocks) => blocks,
                 Err(e) => {
                     println!("cargo:warning=All data sources failed: {e}");
                     anyhow::bail!("Could not fetch data from any source: {}", e)
+                }
+            };
+
+            // Supplement with Bedrock data if primary is Java-based
+            if primary.name() == "PrismarineJS" || primary.name() == "MCPropertyEncyclopedia" {
+                if let Some(bedrock_source) = self.sources.iter().find(|s| s.name() == "BedrockBlockStates") {
+                    if let Ok(bedrock_blocks) = self.try_fetch_source(bedrock_source.as_ref()) {
+                        println!(
+                            "cargo:warning=Supplementing with Bedrock data from {}",
+                            bedrock_source.name()
+                        );
+                        self.merge_bedrock_data(&mut blocks, &bedrock_blocks);
+                    }
+                }
+            }
+
+            Ok(blocks)
+        }
+
+        fn merge_bedrock_data(
+            &self,
+            java_blocks: &mut [UnifiedBlockData],
+            bedrock_blocks: &[UnifiedBlockData],
+        ) {
+            let bedrock_map: HashMap<String, &UnifiedBlockData> = bedrock_blocks
+                .iter()
+                .map(|b| (b.id.clone(), b))
+                .collect();
+
+            for java_block in java_blocks {
+                // Determine the Bedrock ID for this Java block
+                let target_bedrock_id = match java_block.id.as_str() {
+                    "minecraft:wall_torch" => "minecraft:torch",
+                    "minecraft:redstone_wall_torch" => "minecraft:redstone_torch",
+                    "minecraft:soul_wall_torch" => "minecraft:soul_torch",
+                    "minecraft:grass_block" => "minecraft:grass",
+                    "minecraft:repeater" => "minecraft:unpowered_repeater", // Default to unpowered
+                    "minecraft:comparator" => "minecraft:unpowered_comparator",
+                    id if id.ends_with("_slab") => id, // Most slabs are the same
+                    id => id,
+                };
+
+                // Heuristic: Bedrock IDs are mostly the same as Java IDs
+                if let Some(bedrock_block) = bedrock_map.get(target_bedrock_id) {
+                    java_block.bedrock_id = Some(bedrock_block.id.clone());
+                    java_block.bedrock_properties = Some(bedrock_block.properties.clone());
+                    java_block.bedrock_default_state = Some(bedrock_block.default_state.clone());
                 }
             }
         }
@@ -355,6 +504,7 @@ mod data_sources_build {
 
             // Try to load from cache first (for faster rebuilds)
             if cache_path.exists() {
+                println!("cargo:warning=DEBUG: Found cache at {:?}", cache_path);
                 if let Ok(cached_data) = std::fs::read_to_string(&cache_path) {
                     if let Ok(parsed) = serde_json::from_str::<Value>(&cached_data) {
                         if source.validate_structure(&parsed).is_ok() {
@@ -412,6 +562,7 @@ mod data_sources_build {
             // Register default sources
             registry.register_source(Box::new(PrismarineAdapter));
             registry.register_source(Box::new(MCPropertyEncyclopediaAdapter));
+            registry.register_source(Box::new(BedrockDataAdapter));
 
             registry
         }
@@ -445,6 +596,7 @@ fn use_prebuilt_data(out_dir: &str) -> Result<()> {
     // Check if pre-built data exists
     let prismarinejs_file = data_dir.join("prismarinejs_blocks.json");
     let mcproperty_file = data_dir.join("mcproperty_blocks.json");
+    let _bedrock_file = data_dir.join("bedrock_blocks.json");
     
     if !prismarinejs_file.exists() && !mcproperty_file.exists() {
         anyhow::bail!("No pre-built data files found in ./data/ directory. Run 'cargo run --bin build-data --features build-data' to generate them.");
@@ -465,14 +617,67 @@ fn use_prebuilt_data(out_dir: &str) -> Result<()> {
     
     let parsed: Value = serde_json::from_str(&json_data)
         .context("Failed to parse pre-built JSON data")?;
+
+    // Try to load bedrock data if it exists
+    let mut bedrock_blocks = None;
+    let bedrock_states_file = data_dir.join("bedrock_block_states.json");
+    if bedrock_states_file.exists() {
+        println!("cargo:warning=Using pre-built Bedrock block states data");
+        if let Ok(bedrock_json) = fs::read_to_string(&bedrock_states_file) {
+            let adapter = BedrockDataAdapter;
+            if let Ok(blocks) = adapter.parse_data(&bedrock_json) {
+                bedrock_blocks = Some(blocks);
+            }
+        }
+    }
     
-    // Generate PHF table using legacy method for now
-    generate_legacy_phf_table(out_dir, &parsed)?;
+    // If we have bedrock data, we should use the unified PHF table generation
+    if let Some(bedrock_blocks) = bedrock_blocks {
+        let adapter: Box<dyn DataSourceAdapter> = if data_file.to_string_lossy().contains("prismarinejs") {
+            Box::new(PrismarineAdapter)
+        } else {
+            Box::new(MCPropertyEncyclopediaAdapter)
+        };
+        
+        let mut java_blocks = adapter.parse_data(&json_data)?;
+        
+        // Merge bedrock data
+        let bedrock_map: HashMap<String, UnifiedBlockData> = bedrock_blocks
+            .into_iter()
+            .map(|b| (b.id.clone(), b))
+            .collect();
+
+        for java_block in &mut java_blocks {
+            // Determine the Bedrock ID for this Java block
+            let target_bedrock_id = match java_block.id.as_str() {
+                "minecraft:wall_torch" => "minecraft:torch",
+                "minecraft:redstone_wall_torch" => "minecraft:redstone_torch",
+                "minecraft:soul_wall_torch" => "minecraft:soul_torch",
+                "minecraft:grass_block" => "minecraft:grass",
+                "minecraft:repeater" => "minecraft:unpowered_repeater",
+                "minecraft:comparator" => "minecraft:unpowered_comparator",
+                id if id.ends_with("_slab") => id,
+                id => id,
+            };
+
+            if let Some(bedrock_block) = bedrock_map.get(target_bedrock_id) {
+                java_block.bedrock_id = Some(bedrock_block.id.clone());
+                java_block.bedrock_properties = Some(bedrock_block.properties.clone());
+                java_block.bedrock_default_state = Some(bedrock_block.default_state.clone());
+            }
+        }
+        
+        generate_unified_phf_table(out_dir, &java_blocks)?;
+    } else {
+        // Fallback to legacy method for backward compatibility
+        generate_legacy_phf_table(out_dir, &parsed)?;
+    }
     
     println!("cargo:warning=Successfully built blockpedia using pre-built data");
     Ok(())
 }
 
+#[cfg(feature = "build-data")]
 const BLOCKS_DATA_URL: &str = "https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/1.20.4/blocks.json";
 
 // Simple fetcher framework for build script
@@ -1127,6 +1332,11 @@ fn get_block_ids_from_json(json: &Value) -> Result<Vec<String>> {
 fn main() -> Result<()> {
     let out_dir = env::var("OUT_DIR").unwrap();
 
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-env-changed=BLOCKPEDIA_DATA_SOURCE");
+    println!("cargo:rerun-if-env-changed=BLOCKPEDIA_USE_TEST_DATA");
+    println!("cargo:rerun-if-env-changed=BLOCKPEDIA_VERSION_JSON_SHA");
+
     // Check if we should use pre-built data
     if cfg!(feature = "use-prebuilt") || env::var("BLOCKPEDIA_USE_PREBUILT").is_ok() {
         println!("cargo:warning=Using pre-built data files");
@@ -1138,94 +1348,88 @@ fn main() -> Result<()> {
     {
         println!("cargo:warning=Network downloads disabled (build-data feature not enabled)");
         println!("cargo:warning=Checking for pre-built data as fallback...");
-        if let Ok(()) = use_prebuilt_data(&out_dir) {
-            return Ok(());
-        } else {
-            anyhow::bail!("No pre-built data available and network downloads disabled. Run 'cargo run --bin build-data --features build-data' to generate data files.");
-        }
+        use_prebuilt_data(&out_dir).with_context(|| "No pre-built data available and network downloads disabled. Run 'cargo run --bin build-data --features build-data' to generate data files.")
     }
 
-    // Set up data source registry
-    let mut data_registry = DataSourceRegistry::default();
+    #[cfg(feature = "build-data")]
+    {
+        // Set up data source registry
+        let mut data_registry = DataSourceRegistry::default();
 
-    // Check for environment variable to set data source
-    if let Ok(source_name) = env::var("BLOCKPEDIA_DATA_SOURCE") {
+        // Check for environment variable to set data source
+        if let Ok(source_name) = env::var("BLOCKPEDIA_DATA_SOURCE") {
+            println!(
+                "cargo:warning=Setting data source to {} from environment variable",
+                source_name
+            );
+            data_registry
+                .set_primary_source(&source_name)
+                .with_context(|| format!("Failed to set data source to {}", source_name))?;
+        }
+
         println!(
-            "cargo:warning=Setting data source to {} from environment variable",
-            source_name
+            "cargo:warning=Available data sources: {:?}",
+            data_registry.list_sources()
         );
-        data_registry
-            .set_primary_source(&source_name)
-            .with_context(|| format!("Failed to set data source to {}", source_name))?;
-    }
+        println!(
+            "cargo:warning=Using primary data source: {}",
+            data_registry.get_primary_source()?.name()
+        );
 
-    println!(
-        "cargo:warning=Available data sources: {:?}",
-        data_registry.list_sources()
-    );
-    println!(
-        "cargo:warning=Using primary data source: {}",
-        data_registry.get_primary_source()?.name()
-    );
+        let cache_path = Path::new(&out_dir).join("blocks_data.json");
 
-    let cache_path = Path::new(&out_dir).join("blocks_data.json");
+        // Fetch unified data from the selected data source
+        let unified_blocks = if env::var("BLOCKPEDIA_USE_TEST_DATA").is_ok() {
+            // Use legacy fetch method for test data
+            let json_data = fetch_or_load_cached(&cache_path)?;
+            let parsed: Value =
+                serde_json::from_str(&json_data).context("Failed to parse downloaded JSON")?;
+            validate_json_structure(&parsed)?;
 
-    // Fetch unified data from the selected data source
-    let unified_blocks = if env::var("BLOCKPEDIA_USE_TEST_DATA").is_ok() {
-        // Use legacy fetch method for test data
-        let json_data = fetch_or_load_cached(&cache_path)?;
-        let parsed: Value =
-            serde_json::from_str(&json_data).context("Failed to parse downloaded JSON")?;
-        validate_json_structure(&parsed)?;
+            // Convert legacy format to unified format (will be replaced later)
+            vec![] // Placeholder for now, will use legacy generation
+        } else {
+            // Use new unified data source system
+            match data_registry.fetch_unified_data() {
+                Ok(blocks) => blocks,
+                Err(e) => {
+                    println!(
+                        "cargo:warning=Failed to fetch from primary source ({}): {}",
+                        data_registry.get_primary_source()?.name(),
+                        e
+                    );
+                    println!("cargo:warning=Falling back to cached/legacy method");
 
-        // Convert legacy format to unified format (will be replaced later)
-        vec![] // Placeholder for now, will use legacy generation
-    } else {
-        // Use new unified data source system
-        match data_registry.fetch_unified_data() {
-            Ok(blocks) => blocks,
-            Err(e) => {
-                println!(
-                    "cargo:warning=Failed to fetch from primary source ({}): {}",
-                    data_registry.get_primary_source()?.name(),
-                    e
-                );
-                println!("cargo:warning=Falling back to cached/legacy method");
+                    // Fallback to legacy method
+                    let json_data = fetch_or_load_cached(&cache_path)?;
+                    let parsed: Value =
+                        serde_json::from_str(&json_data).context("Failed to parse downloaded JSON")?;
+                    validate_json_structure(&parsed)?;
 
-                // Fallback to legacy method
-                let json_data = fetch_or_load_cached(&cache_path)?;
-                let parsed: Value =
-                    serde_json::from_str(&json_data).context("Failed to parse downloaded JSON")?;
-                validate_json_structure(&parsed)?;
-
-                // Generate using legacy method
-                generate_legacy_phf_table(&out_dir, &parsed)?;
-                return Ok(());
+                    // Generate using legacy method
+                    generate_legacy_phf_table(&out_dir, &parsed)?;
+                    return Ok(());
+                }
             }
+        };
+
+        // For now, if we have unified blocks, generate using legacy method
+        // This will be replaced with unified generation later
+        if unified_blocks.is_empty() || env::var("BLOCKPEDIA_USE_TEST_DATA").is_ok() {
+            let json_data = fetch_or_load_cached(&cache_path)?;
+            let parsed: Value =
+                serde_json::from_str(&json_data).context("Failed to parse downloaded JSON")?;
+            validate_json_structure(&parsed)?;
+            generate_legacy_phf_table(&out_dir, &parsed)?;
+        } else {
+            // Generate from unified data
+            generate_unified_phf_table(&out_dir, &unified_blocks)?;
         }
-    };
-
-    // For now, if we have unified blocks, generate using legacy method
-    // This will be replaced with unified generation later
-    if unified_blocks.is_empty() || env::var("BLOCKPEDIA_USE_TEST_DATA").is_ok() {
-        let json_data = fetch_or_load_cached(&cache_path)?;
-        let parsed: Value =
-            serde_json::from_str(&json_data).context("Failed to parse downloaded JSON")?;
-        validate_json_structure(&parsed)?;
-        generate_legacy_phf_table(&out_dir, &parsed)?;
-    } else {
-        // Generate from unified data
-        generate_unified_phf_table(&out_dir, &unified_blocks)?;
+        Ok(())
     }
-
-    println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-env-changed=BLOCKPEDIA_DATA_SOURCE");
-    println!("cargo:rerun-if-env-changed=BLOCKPEDIA_USE_TEST_DATA");
-    println!("cargo:rerun-if-env-changed=BLOCKPEDIA_VERSION_JSON_SHA");
-
-    Ok(())
 }
 
+#[cfg(feature = "build-data")]
 fn fetch_or_load_cached(cache_path: &Path) -> Result<String> {
     // Check if we should use test data (for development)
     if std::env::var("BLOCKPEDIA_USE_TEST_DATA").is_ok() {
@@ -1273,11 +1477,7 @@ fn download_json() -> Result<String> {
         .context("Failed to read response body as text")
 }
 
-#[cfg(not(feature = "build-data"))]
-fn download_json() -> Result<String> {
-    anyhow::bail!("Network downloads disabled - build-data feature not enabled")
-}
-
+#[cfg(feature = "build-data")]
 fn validate_json_structure(json: &Value) -> Result<()> {
     // Handle two different formats: our test format and PrismarineJS format
     if json.is_object() && json.get("blocks").is_some() {
@@ -1475,12 +1675,19 @@ fn generate_phf_table(
         // Generate a valid Rust identifier from block ID
         let safe_name = block_id.replace(":", "_").replace("-", "_").to_uppercase();
 
+        // Determine transparency (Prismarine data has this, but it's optional)
+        let transparent = block_obj
+            .get("transparent")
+            .and_then(|t| t.as_bool())
+            .unwrap_or(false);
+
         writeln!(
             file,
             "static {}: crate::BlockFacts = crate::BlockFacts {{",
             safe_name
         )?;
         writeln!(file, "    id: \"{}\",", block_id)?;
+        writeln!(file, "    transparent: {},", transparent)?;
 
         // Generate properties array
         writeln!(file, "    properties: &[")?;
@@ -1542,6 +1749,8 @@ fn generate_phf_table(
         } else {
             write!(file, " color: None,")?;
         }
+
+        writeln!(file, " bedrock: None,")?;
 
         writeln!(file, " }},")?;
         writeln!(file, "}};")?;
@@ -1621,6 +1830,7 @@ fn generate_unified_phf_table(out_dir: &str, unified_blocks: &[UnifiedBlockData]
             safe_name
         )?;
         writeln!(file, "    id: \"{}\",", block_id)?;
+        writeln!(file, "    transparent: {},", block_data.transparent)?;
 
         // Generate properties array
         writeln!(file, "    properties: &[")?;
@@ -1676,6 +1886,41 @@ fn generate_unified_phf_table(out_dir: &str, unified_blocks: &[UnifiedBlockData]
             write!(file, " color: None,")?;
         }
 
+        // Bedrock data
+        if let Some(ref bedrock_id) = block_data.bedrock_id {
+            writeln!(file, " bedrock: Some(crate::BedrockData {{")?;
+            writeln!(file, "     id: \"{}\",", bedrock_id)?;
+            
+            // Properties
+            writeln!(file, "     properties: &[")?;
+            if let Some(ref props) = block_data.bedrock_properties {
+                for (prop_name, prop_values) in props {
+                    write!(file, "         (\"{}\", &[", prop_name)?;
+                    for (i, value) in prop_values.iter().enumerate() {
+                        if i > 0 {
+                            write!(file, ", ")?;
+                        }
+                        write!(file, "\"{}\"", value)?;
+                    }
+                    writeln!(file, "]),")?;
+                }
+            }
+            writeln!(file, "     ],")?;
+
+            // Default state
+            writeln!(file, "     default_state: &[")?;
+            if let Some(ref def_state) = block_data.bedrock_default_state {
+                for (prop_name, prop_value) in def_state {
+                    writeln!(file, "         (\"{}\", \"{}\"),", prop_name, prop_value)?;
+                }
+            }
+            writeln!(file, "     ],")?;
+            
+            write!(file, " }}),")?;
+        } else {
+            write!(file, " bedrock: None,")?;
+        }
+
         writeln!(file, " }},")?;
         writeln!(file, "}};")?;
         writeln!(file)?;
@@ -1709,5 +1954,93 @@ fn generate_unified_phf_table(out_dir: &str, unified_blocks: &[UnifiedBlockData]
         "cargo:warning=Generated unified PHF table with {} blocks",
         unified_blocks.len()
     );
+    
+    // Generate bedrock mappings from JSON files
+    generate_bedrock_mappings(out_dir)?;
+    
     Ok(())
+}
+
+/// Generate bedrock blockstate mappings from blocksJ2B.json and blocksB2J.json
+fn generate_bedrock_mappings(out_dir: &str) -> Result<()> {
+    use std::path::Path;
+    
+    let mappings_path = Path::new(out_dir).join("bedrock_mappings.rs");
+    let mut file = std::fs::File::create(&mappings_path)
+        .context("Failed to create bedrock_mappings.rs")?;
+    
+    writeln!(file, "// Auto-generated bedrock blockstate mappings")?;
+    writeln!(file)?;
+    
+    // Load and parse blocksJ2B.json (Java -> Bedrock)
+    let j2b_path = Path::new("data").join("bedrock_blocks_j2b.json");
+    if j2b_path.exists() {
+        let j2b_data = fs::read_to_string(&j2b_path)
+            .context("Failed to read bedrock_blocks_j2b.json")?;
+        let j2b_map: HashMap<String, String> = serde_json::from_str(&j2b_data)
+            .context("Failed to parse bedrock_blocks_j2b.json")?;
+        
+        writeln!(file, "pub static BEDROCK_J2B_MAP: phf::Map<&'static str, &'static str> = phf_map! {{")?;
+        for (java_state, bedrock_state) in &j2b_map {
+            // Normalize the blockstate strings
+            let java_norm = normalize_blockstate_string(java_state);
+            let bedrock_norm = normalize_blockstate_string(bedrock_state);
+            writeln!(file, "    r#\"{}\"# => r#\"{}\"#,", java_norm, bedrock_norm)?;
+        }
+        writeln!(file, "}};")?;
+        writeln!(file)?;
+        
+        println!("cargo:warning=Generated {} Java->Bedrock mappings", j2b_map.len());
+    } else {
+        writeln!(file, "pub static BEDROCK_J2B_MAP: phf::Map<&'static str, &'static str> = phf_map! {{}};")?;
+        println!("cargo:warning=bedrock_blocks_j2b.json not found, using empty mapping");
+    }
+    
+    // Load and parse blocksB2J.json (Bedrock -> Java)
+    let b2j_path = Path::new("data").join("bedrock_blocks_b2j.json");
+    if b2j_path.exists() {
+        let b2j_data = fs::read_to_string(&b2j_path)
+            .context("Failed to read bedrock_blocks_b2j.json")?;
+        let b2j_map: HashMap<String, String> = serde_json::from_str(&b2j_data)
+            .context("Failed to parse bedrock_blocks_b2j.json")?;
+        
+        writeln!(file, "pub static BEDROCK_B2J_MAP: phf::Map<&'static str, &'static str> = phf_map! {{")?;
+        for (bedrock_state, java_state) in &b2j_map {
+            // Normalize the blockstate strings
+            let bedrock_norm = normalize_blockstate_string(bedrock_state);
+            let java_norm = normalize_blockstate_string(java_state);
+            writeln!(file, "    r#\"{}\"# => r#\"{}\"#,", bedrock_norm, java_norm)?;
+        }
+        writeln!(file, "}};")?;
+        
+        println!("cargo:warning=Generated {} Bedrock->Java mappings", b2j_map.len());
+    } else {
+        writeln!(file, "pub static BEDROCK_B2J_MAP: phf::Map<&'static str, &'static str> = phf_map! {{}};")?;
+        println!("cargo:warning=bedrock_blocks_b2j.json not found, using empty mapping");
+    }
+    
+    Ok(())
+}
+
+/// Normalize a blockstate string by sorting properties alphabetically
+fn normalize_blockstate_string(blockstate: &str) -> String {
+    if let Some(bracket_pos) = blockstate.find('[') {
+        let block_id = &blockstate[..bracket_pos];
+        let props_str = &blockstate[bracket_pos + 1..];
+        
+        if props_str.ends_with(']') {
+            let props_str = &props_str[..props_str.len() - 1];
+            if props_str.is_empty() {
+                return format!("{}[]", block_id);
+            }
+            
+            let mut props: Vec<&str> = props_str.split(',').collect();
+            props.sort();
+            format!("{}[{}]", block_id, props.join(","))
+        } else {
+            blockstate.to_string()
+        }
+    } else {
+        format!("{}[]", blockstate)
+    }
 }
