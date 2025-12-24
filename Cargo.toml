@@ -1,6 +1,6 @@
 [package]
 name = "blockpedia"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 rust-version = "1.82"
 authors = ["Nano nano@schem.at"]
@@ -11,11 +11,14 @@ repository = "https://github.com/Nano112/blockpedia"
 license = "MIT"
 keywords = ["minecraft", "blocks", "color", "palette", "gamedev"]
 categories = ["game-development", "graphics", "data-structures"]
-exclude = [
-    "web/*",
-    ".github/*",
-    "examples/*",
-    "tests/*"
+include = [
+    "src/**/*",
+    "Cargo.toml",
+    "build.rs",
+    "README.md",
+    "LICENSE",
+    "assets/textures/*.png",
+    "data/*.json"
 ]
 
 [lib]
