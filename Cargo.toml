@@ -1,6 +1,6 @@
 [package]
 name = "blockpedia"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2021"
 rust-version = "1.82"
 authors = ["Nano nano@schem.at"]
@@ -67,6 +67,9 @@ palette = "0.7"
 # TUI dependencies (optional)
 ratatui = { version = "0.25", optional = true }
 crossterm = { version = "0.27", optional = true }
+fastnbt = "2.6.0"
+serde_bytes = "0.11.19"
+flate2 = "1.1.5"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # CLI utilities need network access for downloading textures

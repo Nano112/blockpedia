@@ -33,6 +33,10 @@ fn main() -> Result<()> {
     println!("Downloading Bedrock Edition data...");
     download_bedrock_data(output_dir)?;
 
+    // Download Geyser mappings
+    println!("Downloading Geyser mappings...");
+    download_geyser_mappings(output_dir)?;
+
     println!("Data build complete! Files saved to ./data/");
     println!("You can now build blockpedia with the 'use-prebuilt' feature.");
 
@@ -40,7 +44,7 @@ fn main() -> Result<()> {
 }
 
 fn download_prismarinejs_data(output_dir: &Path) -> Result<()> {
-    let url = "https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/1.20.4/blocks.json";
+    let url = "https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/1.21.4/blocks.json";
 
     let response = reqwest::blocking::get(url).context("Failed to download PrismarineJS data")?;
 
@@ -125,25 +129,36 @@ fn download_bedrock_data(output_dir: &Path) -> Result<()> {
     fs::write(output_dir.join("bedrock_block_states.json"), &data_states)?;
     println!("✓ Downloaded Bedrock blockStates.json");
 
-    // 3. Download Java -> Bedrock mapping (blocksJ2B.json)
-    let url_j2b = "https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/bedrock/1.21.0/blocksJ2B.json";
-    let response_j2b =
-        reqwest::blocking::get(url_j2b).context("Failed to download Bedrock blocksJ2B.json")?;
-    let data_j2b = response_j2b
-        .text()
-        .context("Failed to read blocksJ2B.json response")?;
-    fs::write(output_dir.join("bedrock_blocks_j2b.json"), &data_j2b)?;
-    println!("✓ Downloaded Bedrock blocksJ2B.json");
+    Ok(())
+}
 
-    // 4. Download Bedrock -> Java mapping (blocksB2J.json)
-    let url_b2j = "https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/bedrock/1.21.0/blocksB2J.json";
-    let response_b2j =
-        reqwest::blocking::get(url_b2j).context("Failed to download Bedrock blocksB2J.json")?;
-    let data_b2j = response_b2j
-        .text()
-        .context("Failed to read blocksB2J.json response")?;
-    fs::write(output_dir.join("bedrock_blocks_b2j.json"), &data_b2j)?;
-    println!("✓ Downloaded Bedrock blocksB2J.json");
+fn download_geyser_mappings(output_dir: &Path) -> Result<()> {
+    let url = "https://raw.githubusercontent.com/GeyserMC/mappings-generator/master/generator_blocks.json";
+    println!("Downloading Geyser mappings from {}...", url);
 
+    let response = reqwest::blocking::get(url).context("Failed to download Geyser mappings")?;
+    
+    if !response.status().is_success() {
+        anyhow::bail!("HTTP request failed with status: {}", response.status());
+    }
+
+    let data = response.text().context("Failed to read response body")?;
+
+    // Validate JSON structure
+    // Expected: { "mappings": [ { "java_state": ..., "bedrock_state": ... }, ... ] }
+    let parsed: serde_json::Value = 
+        serde_json::from_str(&data).context("Failed to parse Geyser mappings JSON")?;
+    
+    if let Some(mappings) = parsed.get("mappings").and_then(|m| m.as_array()) {
+        println!("✓ Validated Geyser mappings ({} entries)", mappings.len());
+    } else {
+        anyhow::bail!("Geyser mappings JSON does not contain 'mappings' array");
+    }
+
+    let output_file = output_dir.join("geyser_mappings.json");
+    fs::write(&output_file, &data)
+        .with_context(|| format!("Failed to write to {:?}", output_file))?;
+    
+    println!("✓ Downloaded Geyser mappings");
     Ok(())
 }
