@@ -732,8 +732,19 @@ impl FetcherRegistry {
     fn extract_colors_from_textures(&mut self, available_block_ids: &[String]) -> Result<()> {
         let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
         let textures_dir = Path::new(&manifest_dir).join("assets/textures");
+        let data_dir = Path::new(&manifest_dir).join("data");
+        let cache_path = data_dir.join("color_cache.json");
+
         if !textures_dir.exists() {
-            println!("cargo:warning=No textures directory found at {textures_dir:?} - using mock color data only");
+            if cache_path.exists() {
+                println!("cargo:warning=Textures not found, but color cache exists. Loading from {cache_path:?}");
+                let cache_data = fs::read_to_string(&cache_path)?;
+                let cache: HashMap<String, (u8, u8, u8, f32, f32, f32)> = serde_json::from_str(&cache_data)?;
+                self.extra_data.color_data.extend(cache);
+                println!("cargo:warning=Loaded {} colors from cache", self.extra_data.color_data.len());
+                return Ok(());
+            }
+            println!("cargo:warning=No textures directory found at {textures_dir:?} and no cache found - using mock color data only");
             return Ok(());
         }
 
@@ -791,6 +802,17 @@ impl FetcherRegistry {
             "cargo:warning=Color extraction complete: {} colors extracted, {} failures",
             extracted_count, failed_count
         );
+
+        // Save to cache if we extracted colors
+        if extracted_count > 0 {
+            let cache_data = serde_json::to_string_pretty(&self.extra_data.color_data)?;
+            if !data_dir.exists() {
+                fs::create_dir_all(&data_dir)?;
+            }
+            fs::write(&cache_path, cache_data)?;
+            println!("cargo:warning=Updated color cache at {cache_path:?}");
+        }
+
         Ok(())
     }
 

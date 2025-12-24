@@ -11,14 +11,12 @@ repository = "https://github.com/Nano112/blockpedia"
 license = "MIT"
 keywords = ["minecraft", "blocks", "color", "palette", "gamedev"]
 categories = ["game-development", "graphics", "data-structures"]
-include = [
-    "src/**/*",
-    "Cargo.toml",
-    "build.rs",
-    "README.md",
-    "LICENSE",
-    "assets/textures/*.png",
-    "data/*.json"
+exclude = [
+    "web/*",
+    ".github/*",
+    "examples/*",
+    "tests/*",
+    "assets/textures/*"
 ]
 
 [lib]
