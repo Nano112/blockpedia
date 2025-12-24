@@ -602,7 +602,8 @@ use data_sources_build::*;
 
 /// Use pre-built data files instead of downloading
 fn use_prebuilt_data(out_dir: &str) -> Result<()> {
-    let data_dir = Path::new("data");
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+    let data_dir = Path::new(&manifest_dir).join("data");
 
     // Check if pre-built data exists
     let prismarinejs_file = data_dir.join("prismarinejs_blocks.json");
@@ -729,19 +730,17 @@ impl FetcherRegistry {
 
     /// Extract colors from all available textures
     fn extract_colors_from_textures(&mut self, available_block_ids: &[String]) -> Result<()> {
-        use std::path::Path;
-
-        // Build texture mapping
-        let textures_dir = Path::new("assets/textures");
+        let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+        let textures_dir = Path::new(&manifest_dir).join("assets/textures");
         if !textures_dir.exists() {
-            println!("cargo:warning=No textures directory found - using mock color data only");
+            println!("cargo:warning=No textures directory found at {textures_dir:?} - using mock color data only");
             return Ok(());
         }
 
         println!("cargo:warning=Extracting colors from textures in {textures_dir:?}");
 
         // Scan texture files
-        let texture_files: Vec<String> = std::fs::read_dir(textures_dir)
+        let texture_files: Vec<String> = std::fs::read_dir(&textures_dir)
             .context("Failed to read textures directory")?
             .filter_map(|entry| {
                 let entry = entry.ok()?;
@@ -1975,7 +1974,8 @@ fn generate_unified_phf_table(out_dir: &str, unified_blocks: &[UnifiedBlockData]
 
 /// Generate bedrock blockstate mappings from blocksJ2B.json and blocksB2J.json
 fn generate_bedrock_mappings(out_dir: &str) -> Result<()> {
-    use std::path::Path;
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+    let data_dir = Path::new(&manifest_dir).join("data");
 
     let mappings_path = Path::new(out_dir).join("bedrock_mappings.rs");
     let mut file =
@@ -1985,7 +1985,7 @@ fn generate_bedrock_mappings(out_dir: &str) -> Result<()> {
     writeln!(file)?;
 
     // Load and parse blocksJ2B.json (Java -> Bedrock)
-    let j2b_path = Path::new("data").join("bedrock_blocks_j2b.json");
+    let j2b_path = data_dir.join("bedrock_blocks_j2b.json");
     if j2b_path.exists() {
         let j2b_data =
             fs::read_to_string(&j2b_path).context("Failed to read bedrock_blocks_j2b.json")?;
@@ -2014,11 +2014,14 @@ fn generate_bedrock_mappings(out_dir: &str) -> Result<()> {
             file,
             "pub static BEDROCK_J2B_MAP: phf::Map<&'static str, &'static str> = phf_map! {{}};"
         )?;
-        println!("cargo:warning=bedrock_blocks_j2b.json not found, using empty mapping");
+        println!(
+            "cargo:warning=bedrock_blocks_j2b.json not found at {:?}, using empty mapping",
+            j2b_path
+        );
     }
 
     // Load and parse blocksB2J.json (Bedrock -> Java)
-    let b2j_path = Path::new("data").join("bedrock_blocks_b2j.json");
+    let b2j_path = data_dir.join("bedrock_blocks_b2j.json");
     if b2j_path.exists() {
         let b2j_data =
             fs::read_to_string(&b2j_path).context("Failed to read bedrock_blocks_b2j.json")?;
@@ -2046,7 +2049,10 @@ fn generate_bedrock_mappings(out_dir: &str) -> Result<()> {
             file,
             "pub static BEDROCK_B2J_MAP: phf::Map<&'static str, &'static str> = phf_map! {{}};"
         )?;
-        println!("cargo:warning=bedrock_blocks_b2j.json not found, using empty mapping");
+        println!(
+            "cargo:warning=bedrock_blocks_b2j.json not found at {:?}, using empty mapping",
+            b2j_path
+        );
     }
 
     Ok(())
