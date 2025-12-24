@@ -1994,7 +1994,7 @@ fn generate_unified_phf_table(out_dir: &str, unified_blocks: &[UnifiedBlockData]
     Ok(())
 }
 
-/// Generate bedrock blockstate mappings from blocksJ2B.json and blocksB2J.json
+/// Generate bedrock blockstate mappings from geyser_mappings.json
 fn generate_bedrock_mappings(out_dir: &str) -> Result<()> {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
     let data_dir = Path::new(&manifest_dir).join("data");
@@ -2006,99 +2006,143 @@ fn generate_bedrock_mappings(out_dir: &str) -> Result<()> {
     writeln!(file, "// Auto-generated bedrock blockstate mappings")?;
     writeln!(file)?;
 
-    // Load and parse blocksJ2B.json (Java -> Bedrock)
-    let j2b_path = data_dir.join("bedrock_blocks_j2b.json");
-    if j2b_path.exists() {
-        let j2b_data =
-            fs::read_to_string(&j2b_path).context("Failed to read bedrock_blocks_j2b.json")?;
-        let j2b_map: HashMap<String, String> =
-            serde_json::from_str(&j2b_data).context("Failed to parse bedrock_blocks_j2b.json")?;
+    // Load and parse geyser_mappings.json
+    let geyser_path = data_dir.join("geyser_mappings.json");
+    if geyser_path.exists() {
+        let geyser_data =
+            fs::read_to_string(&geyser_path).context("Failed to read geyser_mappings.json")?;
+        
+        let parsed: Option<Value> = match serde_json::from_str(&geyser_data) {
+            Ok(p) => Some(p),
+            Err(e) => {
+                println!("cargo:warning=Failed to parse geyser_mappings.json: {}", e);
+                None
+            }
+        };
 
-        writeln!(
-            file,
-            "pub static BEDROCK_J2B_MAP: phf::Map<&'static str, &'static str> = phf_map! {{"
-        )?;
-        for (java_state, bedrock_state) in &j2b_map {
-            // Normalize the blockstate strings
-            let java_norm = normalize_blockstate_string(java_state);
-            let bedrock_norm = normalize_blockstate_string(bedrock_state);
-            writeln!(file, "    r#\"{}\"# => r#\"{}\"#,", java_norm, bedrock_norm)?;
+        if let Some(parsed) = parsed {
+            let mappings = parsed
+                .get("mappings")
+                .and_then(|m| m.as_array());
+                
+            if let Some(mappings) = mappings {
+                // Java -> Bedrock Map
+                writeln!(
+                    file,
+                    "pub static BEDROCK_J2B_MAP: phf::Map<&'static str, &'static str> = phf_map! {{"
+                )?;
+
+                // Collect mappings for B2J (we'll need to reverse them)
+                let mut b2j_map: HashMap<String, String> = HashMap::new();
+
+                for mapping in mappings {
+                    let java_state_obj = mapping.get("java_state").and_then(|s| s.as_object());
+                    let bedrock_state_obj = mapping.get("bedrock_state").and_then(|s| s.as_object());
+
+                    if let (Some(java), Some(bedrock)) = (java_state_obj, bedrock_state_obj) {
+                        // Format Java String
+                        let java_name = java.get("Name").and_then(|n| n.as_str()).unwrap_or("");
+                        let java_props = java.get("Properties").and_then(|p| p.as_object());
+                        
+                        let java_state_str = if let Some(props) = java_props {
+                            let mut props_vec: Vec<String> = props.iter()
+                                .map(|(k, v)| format!("{}={}", k, v.as_str().unwrap_or("")))
+                                .collect();
+                            props_vec.sort();
+                            format!("{}[{}]", java_name, props_vec.join(","))
+                        } else {
+                            format!("{}[]", java_name)
+                        };
+
+                        // Format Bedrock String
+                        // Geyser identifier often lacks "minecraft:" prefix if it's vanilla
+                        let bedrock_id_raw = bedrock.get("bedrock_identifier").and_then(|n| n.as_str()).unwrap_or("");
+                        let bedrock_id = if !bedrock_id_raw.contains(':') {
+                            format!("minecraft:{}", bedrock_id_raw)
+                        } else {
+                            bedrock_id_raw.to_string()
+                        };
+
+                        let bedrock_props = bedrock.get("state").and_then(|s| s.as_object());
+                        let bedrock_state_str = if let Some(props) = bedrock_props {
+                            let mut props_vec: Vec<String> = props.iter()
+                                .map(|(k, v)| {
+                                    let val_str = match v {
+                                        Value::Bool(b) => b.to_string(),
+                                        Value::Number(n) => n.to_string(),
+                                        Value::String(s) => s.clone(),
+                                        _ => v.to_string(),
+                                    };
+                                    format!("{}={}", k, val_str)
+                                })
+                                .collect();
+                            props_vec.sort();
+                            format!("{}[{}]", bedrock_id, props_vec.join(","))
+                        } else {
+                            format!("{}[]", bedrock_id)
+                        };
+
+                        writeln!(file, "    r#\"{}\"# => r#\"{}\"#,", java_state_str, bedrock_state_str)?;
+                        
+                        // Store for B2J (overwrite duplicates, last wins - or check logic)
+                        b2j_map.entry(bedrock_state_str).or_insert(java_state_str);
+                    }
+                }
+                writeln!(file, "}};")?;
+                writeln!(file)?;
+
+                println!(
+                    "cargo:warning=Generated {} Java->Bedrock mappings from Geyser",
+                    mappings.len()
+                );
+
+                // Bedrock -> Java Map
+                writeln!(
+                    file,
+                    "pub static BEDROCK_B2J_MAP: phf::Map<&'static str, &'static str> = phf_map! {{"
+                )?;
+                for (bedrock_state, java_state) in &b2j_map {
+                    writeln!(file, "    r#\"{}\"# => r#\"{}\"#,", bedrock_state, java_state)?;
+                }
+                writeln!(file, "}};")?;
+                
+                println!(
+                    "cargo:warning=Generated {} Bedrock->Java mappings from Geyser",
+                    b2j_map.len()
+                );
+            } else {
+                println!("cargo:warning=Invalid Geyser mappings format (missing 'mappings' array)");
+                generate_empty_mappings(&mut file)?;
+            }
+        } else {
+            generate_empty_mappings(&mut file)?;
         }
-        writeln!(file, "}};")?;
-        writeln!(file)?;
-
-        println!(
-            "cargo:warning=Generated {} Java->Bedrock mappings",
-            j2b_map.len()
-        );
     } else {
         writeln!(
             file,
             "pub static BEDROCK_J2B_MAP: phf::Map<&'static str, &'static str> = phf_map! {{}};"
         )?;
-        println!(
-            "cargo:warning=bedrock_blocks_j2b.json not found at {:?}, using empty mapping",
-            j2b_path
-        );
-    }
-
-    // Load and parse blocksB2J.json (Bedrock -> Java)
-    let b2j_path = data_dir.join("bedrock_blocks_b2j.json");
-    if b2j_path.exists() {
-        let b2j_data =
-            fs::read_to_string(&b2j_path).context("Failed to read bedrock_blocks_b2j.json")?;
-        let b2j_map: HashMap<String, String> =
-            serde_json::from_str(&b2j_data).context("Failed to parse bedrock_blocks_b2j.json")?;
-
-        writeln!(
-            file,
-            "pub static BEDROCK_B2J_MAP: phf::Map<&'static str, &'static str> = phf_map! {{"
-        )?;
-        for (bedrock_state, java_state) in &b2j_map {
-            // Normalize the blockstate strings
-            let bedrock_norm = normalize_blockstate_string(bedrock_state);
-            let java_norm = normalize_blockstate_string(java_state);
-            writeln!(file, "    r#\"{}\"# => r#\"{}\"#,", bedrock_norm, java_norm)?;
-        }
-        writeln!(file, "}};")?;
-
-        println!(
-            "cargo:warning=Generated {} Bedrock->Java mappings",
-            b2j_map.len()
-        );
-    } else {
         writeln!(
             file,
             "pub static BEDROCK_B2J_MAP: phf::Map<&'static str, &'static str> = phf_map! {{}};"
         )?;
         println!(
-            "cargo:warning=bedrock_blocks_b2j.json not found at {:?}, using empty mapping",
-            b2j_path
+            "cargo:warning=geyser_mappings.json not found at {:?}, using empty mapping",
+            geyser_path
         );
     }
 
     Ok(())
 }
 
-/// Normalize a blockstate string by sorting properties alphabetically
-fn normalize_blockstate_string(blockstate: &str) -> String {
-    if let Some(bracket_pos) = blockstate.find('[') {
-        let block_id = &blockstate[..bracket_pos];
-        let props_str = &blockstate[bracket_pos + 1..];
-
-        if props_str.ends_with(']') {
-            let props_str = &props_str[..props_str.len() - 1];
-            if props_str.is_empty() {
-                return format!("{}[]", block_id);
-            }
-
-            let mut props: Vec<&str> = props_str.split(',').collect();
-            props.sort();
-            format!("{}[{}]", block_id, props.join(","))
-        } else {
-            blockstate.to_string()
-        }
-    } else {
-        format!("{}[]", blockstate)
-    }
+fn generate_empty_mappings(file: &mut std::fs::File) -> Result<()> {
+    writeln!(
+        file,
+        "pub static BEDROCK_J2B_MAP: phf::Map<&'static str, &'static str> = phf_map! {{}};"
+    )?;
+    writeln!(
+        file,
+        "pub static BEDROCK_B2J_MAP: phf::Map<&'static str, &'static str> = phf_map! {{}};"
+    )?;
+    Ok(())
 }
