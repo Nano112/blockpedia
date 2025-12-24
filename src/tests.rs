@@ -588,11 +588,13 @@ mod bedrock_translation_tests {
     fn redstone_wire_java_to_bedrock() {
         // Only run if redstone_wire exists in the current data
         if let Some(java_facts) = BLOCKS.get("minecraft:redstone_wire") {
-            let java_state = BlockState::from_default(java_facts).unwrap()
-                .with("power", "15").unwrap();
-            
+            let java_state = BlockState::from_default(java_facts)
+                .unwrap()
+                .with("power", "15")
+                .unwrap();
+
             let bedrock_state = java_state.to_bedrock().unwrap();
-            
+
             assert_eq!(bedrock_state.id(), "minecraft:redstone_wire");
             assert_eq!(bedrock_state.get_property("redstone_signal"), Some("15"));
         }
@@ -601,14 +603,17 @@ mod bedrock_translation_tests {
     #[test]
     fn redstone_wire_bedrock_to_java() {
         // Only run if redstone_wire has Bedrock mapping
-        let java_facts = BLOCKS.values().find(|f| f.id == "minecraft:redstone_wire" && f.extras.bedrock.is_some());
-        
+        let java_facts = BLOCKS
+            .values()
+            .find(|f| f.id == "minecraft:redstone_wire" && f.extras.bedrock.is_some());
+
         if java_facts.is_some() {
             let mut bedrock_props = HashMap::new();
             bedrock_props.insert("redstone_signal".to_string(), "15".to_string());
-            
-            let java_state = BlockState::from_bedrock("minecraft:redstone_wire", bedrock_props).unwrap();
-            
+
+            let java_state =
+                BlockState::from_bedrock("minecraft:redstone_wire", bedrock_props).unwrap();
+
             assert_eq!(java_state.id(), "minecraft:redstone_wire");
             assert_eq!(java_state.get_property("power"), Some("15"));
         }
@@ -617,17 +622,23 @@ mod bedrock_translation_tests {
     #[test]
     fn repeater_java_to_bedrock_facing() {
         if let Some(java_facts) = BLOCKS.get("minecraft:repeater") {
-            let java_state = BlockState::from_default(java_facts).unwrap()
-                .with("facing", "north").unwrap()
-                .with("powered", "false").unwrap();
-            
+            let java_state = BlockState::from_default(java_facts)
+                .unwrap()
+                .with("facing", "north")
+                .unwrap()
+                .with("powered", "false")
+                .unwrap();
+
             // Check if it has bedrock data
             if java_facts.extras.bedrock.is_some() {
                 let bedrock_state = java_state.to_bedrock().unwrap();
                 // Java "repeater" + "powered=false" -> Bedrock "unpowered_repeater"
                 assert_eq!(bedrock_state.id(), "minecraft:unpowered_repeater");
                 // Java "north" -> Bedrock cardinal_direction "north" (for repeaters)
-                assert_eq!(bedrock_state.get_property("minecraft:cardinal_direction"), Some("north"));
+                assert_eq!(
+                    bedrock_state.get_property("minecraft:cardinal_direction"),
+                    Some("north")
+                );
             }
         }
     }
@@ -635,9 +646,11 @@ mod bedrock_translation_tests {
     #[test]
     fn powered_repeater_java_to_bedrock() {
         if let Some(java_facts) = BLOCKS.get("minecraft:repeater") {
-            let java_state = BlockState::from_default(java_facts).unwrap()
-                .with("powered", "true").unwrap();
-            
+            let java_state = BlockState::from_default(java_facts)
+                .unwrap()
+                .with("powered", "true")
+                .unwrap();
+
             if java_facts.extras.bedrock.is_some() {
                 let bedrock_state = java_state.to_bedrock().unwrap();
                 // Java "repeater" + "powered=true" -> Bedrock "powered_repeater"
@@ -649,15 +662,20 @@ mod bedrock_translation_tests {
     #[test]
     fn wall_torch_java_to_bedrock() {
         if let Some(java_facts) = BLOCKS.get("minecraft:wall_torch") {
-            let java_state = BlockState::from_default(java_facts).unwrap()
-                .with("facing", "north").unwrap();
-            
+            let java_state = BlockState::from_default(java_facts)
+                .unwrap()
+                .with("facing", "north")
+                .unwrap();
+
             if java_facts.extras.bedrock.is_some() {
                 let bedrock_state = java_state.to_bedrock().unwrap();
                 // Java "wall_torch" -> Bedrock "torch"
                 assert_eq!(bedrock_state.id(), "minecraft:torch");
                 // Java "facing=north" -> Bedrock "torch_facing_direction=south"
-                assert_eq!(bedrock_state.get_property("torch_facing_direction"), Some("south"));
+                assert_eq!(
+                    bedrock_state.get_property("torch_facing_direction"),
+                    Some("south")
+                );
             }
         }
     }
@@ -667,7 +685,7 @@ mod bedrock_translation_tests {
         // Bedrock side torch
         let mut props = HashMap::new();
         props.insert("torch_facing_direction".to_string(), "south".to_string());
-        
+
         let java_state = BlockState::from_bedrock("minecraft:torch", props).unwrap();
         // Bedrock "torch" + "south" -> Java "wall_torch" + "north"
         assert_eq!(java_state.id(), "minecraft:wall_torch");
@@ -676,7 +694,7 @@ mod bedrock_translation_tests {
         // Bedrock top torch
         let mut props = HashMap::new();
         props.insert("torch_facing_direction".to_string(), "top".to_string());
-        
+
         let java_state = BlockState::from_bedrock("minecraft:torch", props).unwrap();
         // Bedrock "torch" + "top" -> Java "torch"
         assert_eq!(java_state.id(), "minecraft:torch");
@@ -685,9 +703,11 @@ mod bedrock_translation_tests {
     #[test]
     fn stairs_java_to_bedrock_half() {
         if let Some(java_facts) = BLOCKS.get("minecraft:oak_stairs") {
-            let java_state = BlockState::from_default(java_facts).unwrap()
-                .with("half", "top").unwrap();
-            
+            let java_state = BlockState::from_default(java_facts)
+                .unwrap()
+                .with("half", "top")
+                .unwrap();
+
             if java_facts.extras.bedrock.is_some() {
                 let bedrock_state = java_state.to_bedrock().unwrap();
                 // Java "half=top" -> Bedrock "upside_down_bit=true"
@@ -699,9 +719,11 @@ mod bedrock_translation_tests {
     #[test]
     fn door_java_to_bedrock_half() {
         if let Some(java_facts) = BLOCKS.get("minecraft:oak_door") {
-            let java_state = BlockState::from_default(java_facts).unwrap()
-                .with("half", "upper").unwrap();
-            
+            let java_state = BlockState::from_default(java_facts)
+                .unwrap()
+                .with("half", "upper")
+                .unwrap();
+
             if java_facts.extras.bedrock.is_some() {
                 let bedrock_state = java_state.to_bedrock().unwrap();
                 // Java "half=upper" -> Bedrock "upper_block_bit=true"

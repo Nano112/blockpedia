@@ -26,13 +26,13 @@ impl BedrockBlockStateMapper {
         if let Some(bracket_pos) = blockstate.find('[') {
             let block_id = &blockstate[..bracket_pos];
             let props_str = &blockstate[bracket_pos + 1..];
-            
+
             if props_str.ends_with(']') {
                 let props_str = &props_str[..props_str.len() - 1];
                 if props_str.is_empty() {
                     return format!("{}[]", block_id);
                 }
-                
+
                 let mut props: Vec<&str> = props_str.split(',').collect();
                 props.sort();
                 format!("{}[{}]", block_id, props.join(","))

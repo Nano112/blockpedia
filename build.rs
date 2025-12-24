@@ -263,20 +263,25 @@ mod data_sources_build {
         }
 
         fn parse_data(&self, json_data: &str) -> Result<Vec<UnifiedBlockData>> {
-            let parsed: Value =
-                serde_json::from_str(json_data).context("Failed to parse Bedrock blockStates.json")?;
+            let parsed: Value = serde_json::from_str(json_data)
+                .context("Failed to parse Bedrock blockStates.json")?;
 
             let states_array = parsed
                 .as_array()
                 .context("Bedrock blockStates.json is not an array")?;
 
-            let mut block_info_map: HashMap<String, (HashMap<String, Vec<String>>, HashMap<String, String>)> = HashMap::new();
+            let mut block_info_map: HashMap<
+                String,
+                (HashMap<String, Vec<String>>, HashMap<String, String>),
+            > = HashMap::new();
 
             for state_entry in states_array {
                 if let Some(state_obj) = state_entry.as_object() {
                     if let Some(name) = state_obj.get("name").and_then(|n| n.as_str()) {
-                        let info = block_info_map.entry(name.to_string()).or_insert_with(|| (HashMap::new(), HashMap::new()));
-                        
+                        let info = block_info_map
+                            .entry(name.to_string())
+                            .or_insert_with(|| (HashMap::new(), HashMap::new()));
+
                         if let Some(states) = state_obj.get("states").and_then(|s| s.as_object()) {
                             for (prop_name, prop_val_obj) in states {
                                 if let Some(val) = prop_val_obj.get("value") {
@@ -286,13 +291,14 @@ mod data_sources_build {
                                         Value::String(s) => s.clone(),
                                         _ => continue,
                                     };
-                                    
+
                                     // Add to unique values for this property
-                                    let values = info.0.entry(prop_name.clone()).or_insert_with(Vec::new);
+                                    let values =
+                                        info.0.entry(prop_name.clone()).or_insert_with(Vec::new);
                                     if !values.contains(&val_str) {
                                         values.push(val_str.clone());
                                     }
-                                    
+
                                     // First seen value becomes the default (heuristic)
                                     info.1.entry(prop_name.clone()).or_insert(val_str.clone());
                                 }
@@ -317,7 +323,10 @@ mod data_sources_build {
                 });
             }
 
-            println!("cargo:warning=DEBUG: BedrockDataAdapter parsed {} unique blocks", unified_blocks.len());
+            println!(
+                "cargo:warning=DEBUG: BedrockDataAdapter parsed {} unique blocks",
+                unified_blocks.len()
+            );
             Ok(unified_blocks)
         }
 
@@ -390,7 +399,11 @@ mod data_sources_build {
 
             // Supplement with Bedrock data if primary is Java-based
             if primary.name() == "PrismarineJS" || primary.name() == "MCPropertyEncyclopedia" {
-                if let Some(bedrock_source) = self.sources.iter().find(|s| s.name() == "BedrockBlockStates") {
+                if let Some(bedrock_source) = self
+                    .sources
+                    .iter()
+                    .find(|s| s.name() == "BedrockBlockStates")
+                {
                     if let Ok(bedrock_blocks) = self.try_fetch_source(bedrock_source.as_ref()) {
                         println!(
                             "cargo:warning=Supplementing with Bedrock data from {}",
@@ -409,10 +422,8 @@ mod data_sources_build {
             java_blocks: &mut [UnifiedBlockData],
             bedrock_blocks: &[UnifiedBlockData],
         ) {
-            let bedrock_map: HashMap<String, &UnifiedBlockData> = bedrock_blocks
-                .iter()
-                .map(|b| (b.id.clone(), b))
-                .collect();
+            let bedrock_map: HashMap<String, &UnifiedBlockData> =
+                bedrock_blocks.iter().map(|b| (b.id.clone(), b)).collect();
 
             for java_block in java_blocks {
                 // Determine the Bedrock ID for this Java block
@@ -580,7 +591,7 @@ mod data_sources_build {
             .text()
             .context("Failed to read response body as text")
     }
-    
+
     #[cfg(not(feature = "build-data"))]
     fn download_from_url(_url: &str) -> Result<String> {
         anyhow::bail!("Network downloads disabled - build-data feature not enabled")
@@ -592,16 +603,16 @@ use data_sources_build::*;
 /// Use pre-built data files instead of downloading
 fn use_prebuilt_data(out_dir: &str) -> Result<()> {
     let data_dir = Path::new("data");
-    
+
     // Check if pre-built data exists
     let prismarinejs_file = data_dir.join("prismarinejs_blocks.json");
     let mcproperty_file = data_dir.join("mcproperty_blocks.json");
     let _bedrock_file = data_dir.join("bedrock_blocks.json");
-    
+
     if !prismarinejs_file.exists() && !mcproperty_file.exists() {
         anyhow::bail!("No pre-built data files found in ./data/ directory. Run 'cargo run --bin build-data --features build-data' to generate them.");
     }
-    
+
     // Use PrismarineJS data if available, otherwise MCProperty
     let data_file = if prismarinejs_file.exists() {
         println!("cargo:warning=Using pre-built PrismarineJS data");
@@ -610,13 +621,13 @@ fn use_prebuilt_data(out_dir: &str) -> Result<()> {
         println!("cargo:warning=Using pre-built MCPropertyEncyclopedia data");
         mcproperty_file
     };
-    
+
     // Load and parse the pre-built data
     let json_data = fs::read_to_string(&data_file)
         .with_context(|| format!("Failed to read pre-built data from {:?}", data_file))?;
-    
-    let parsed: Value = serde_json::from_str(&json_data)
-        .context("Failed to parse pre-built JSON data")?;
+
+    let parsed: Value =
+        serde_json::from_str(&json_data).context("Failed to parse pre-built JSON data")?;
 
     // Try to load bedrock data if it exists
     let mut bedrock_blocks = None;
@@ -630,17 +641,18 @@ fn use_prebuilt_data(out_dir: &str) -> Result<()> {
             }
         }
     }
-    
+
     // If we have bedrock data, we should use the unified PHF table generation
     if let Some(bedrock_blocks) = bedrock_blocks {
-        let adapter: Box<dyn DataSourceAdapter> = if data_file.to_string_lossy().contains("prismarinejs") {
-            Box::new(PrismarineAdapter)
-        } else {
-            Box::new(MCPropertyEncyclopediaAdapter)
-        };
-        
+        let adapter: Box<dyn DataSourceAdapter> =
+            if data_file.to_string_lossy().contains("prismarinejs") {
+                Box::new(PrismarineAdapter)
+            } else {
+                Box::new(MCPropertyEncyclopediaAdapter)
+            };
+
         let mut java_blocks = adapter.parse_data(&json_data)?;
-        
+
         // Merge bedrock data
         let bedrock_map: HashMap<String, UnifiedBlockData> = bedrock_blocks
             .into_iter()
@@ -666,13 +678,13 @@ fn use_prebuilt_data(out_dir: &str) -> Result<()> {
                 java_block.bedrock_default_state = Some(bedrock_block.default_state.clone());
             }
         }
-        
+
         generate_unified_phf_table(out_dir, &java_blocks)?;
     } else {
         // Fallback to legacy method for backward compatibility
         generate_legacy_phf_table(out_dir, &parsed)?;
     }
-    
+
     println!("cargo:warning=Successfully built blockpedia using pre-built data");
     Ok(())
 }
@@ -1402,8 +1414,8 @@ fn main() -> Result<()> {
 
                     // Fallback to legacy method
                     let json_data = fetch_or_load_cached(&cache_path)?;
-                    let parsed: Value =
-                        serde_json::from_str(&json_data).context("Failed to parse downloaded JSON")?;
+                    let parsed: Value = serde_json::from_str(&json_data)
+                        .context("Failed to parse downloaded JSON")?;
                     validate_json_structure(&parsed)?;
 
                     // Generate using legacy method
@@ -1890,7 +1902,7 @@ fn generate_unified_phf_table(out_dir: &str, unified_blocks: &[UnifiedBlockData]
         if let Some(ref bedrock_id) = block_data.bedrock_id {
             writeln!(file, " bedrock: Some(crate::BedrockData {{")?;
             writeln!(file, "     id: \"{}\",", bedrock_id)?;
-            
+
             // Properties
             writeln!(file, "     properties: &[")?;
             if let Some(ref props) = block_data.bedrock_properties {
@@ -1915,7 +1927,7 @@ fn generate_unified_phf_table(out_dir: &str, unified_blocks: &[UnifiedBlockData]
                 }
             }
             writeln!(file, "     ],")?;
-            
+
             write!(file, " }}),")?;
         } else {
             write!(file, " bedrock: None,")?;
@@ -1954,33 +1966,36 @@ fn generate_unified_phf_table(out_dir: &str, unified_blocks: &[UnifiedBlockData]
         "cargo:warning=Generated unified PHF table with {} blocks",
         unified_blocks.len()
     );
-    
+
     // Generate bedrock mappings from JSON files
     generate_bedrock_mappings(out_dir)?;
-    
+
     Ok(())
 }
 
 /// Generate bedrock blockstate mappings from blocksJ2B.json and blocksB2J.json
 fn generate_bedrock_mappings(out_dir: &str) -> Result<()> {
     use std::path::Path;
-    
+
     let mappings_path = Path::new(out_dir).join("bedrock_mappings.rs");
-    let mut file = std::fs::File::create(&mappings_path)
-        .context("Failed to create bedrock_mappings.rs")?;
-    
+    let mut file =
+        std::fs::File::create(&mappings_path).context("Failed to create bedrock_mappings.rs")?;
+
     writeln!(file, "// Auto-generated bedrock blockstate mappings")?;
     writeln!(file)?;
-    
+
     // Load and parse blocksJ2B.json (Java -> Bedrock)
     let j2b_path = Path::new("data").join("bedrock_blocks_j2b.json");
     if j2b_path.exists() {
-        let j2b_data = fs::read_to_string(&j2b_path)
-            .context("Failed to read bedrock_blocks_j2b.json")?;
-        let j2b_map: HashMap<String, String> = serde_json::from_str(&j2b_data)
-            .context("Failed to parse bedrock_blocks_j2b.json")?;
-        
-        writeln!(file, "pub static BEDROCK_J2B_MAP: phf::Map<&'static str, &'static str> = phf_map! {{")?;
+        let j2b_data =
+            fs::read_to_string(&j2b_path).context("Failed to read bedrock_blocks_j2b.json")?;
+        let j2b_map: HashMap<String, String> =
+            serde_json::from_str(&j2b_data).context("Failed to parse bedrock_blocks_j2b.json")?;
+
+        writeln!(
+            file,
+            "pub static BEDROCK_J2B_MAP: phf::Map<&'static str, &'static str> = phf_map! {{"
+        )?;
         for (java_state, bedrock_state) in &j2b_map {
             // Normalize the blockstate strings
             let java_norm = normalize_blockstate_string(java_state);
@@ -1989,22 +2004,31 @@ fn generate_bedrock_mappings(out_dir: &str) -> Result<()> {
         }
         writeln!(file, "}};")?;
         writeln!(file)?;
-        
-        println!("cargo:warning=Generated {} Java->Bedrock mappings", j2b_map.len());
+
+        println!(
+            "cargo:warning=Generated {} Java->Bedrock mappings",
+            j2b_map.len()
+        );
     } else {
-        writeln!(file, "pub static BEDROCK_J2B_MAP: phf::Map<&'static str, &'static str> = phf_map! {{}};")?;
+        writeln!(
+            file,
+            "pub static BEDROCK_J2B_MAP: phf::Map<&'static str, &'static str> = phf_map! {{}};"
+        )?;
         println!("cargo:warning=bedrock_blocks_j2b.json not found, using empty mapping");
     }
-    
+
     // Load and parse blocksB2J.json (Bedrock -> Java)
     let b2j_path = Path::new("data").join("bedrock_blocks_b2j.json");
     if b2j_path.exists() {
-        let b2j_data = fs::read_to_string(&b2j_path)
-            .context("Failed to read bedrock_blocks_b2j.json")?;
-        let b2j_map: HashMap<String, String> = serde_json::from_str(&b2j_data)
-            .context("Failed to parse bedrock_blocks_b2j.json")?;
-        
-        writeln!(file, "pub static BEDROCK_B2J_MAP: phf::Map<&'static str, &'static str> = phf_map! {{")?;
+        let b2j_data =
+            fs::read_to_string(&b2j_path).context("Failed to read bedrock_blocks_b2j.json")?;
+        let b2j_map: HashMap<String, String> =
+            serde_json::from_str(&b2j_data).context("Failed to parse bedrock_blocks_b2j.json")?;
+
+        writeln!(
+            file,
+            "pub static BEDROCK_B2J_MAP: phf::Map<&'static str, &'static str> = phf_map! {{"
+        )?;
         for (bedrock_state, java_state) in &b2j_map {
             // Normalize the blockstate strings
             let bedrock_norm = normalize_blockstate_string(bedrock_state);
@@ -2012,13 +2036,19 @@ fn generate_bedrock_mappings(out_dir: &str) -> Result<()> {
             writeln!(file, "    r#\"{}\"# => r#\"{}\"#,", bedrock_norm, java_norm)?;
         }
         writeln!(file, "}};")?;
-        
-        println!("cargo:warning=Generated {} Bedrock->Java mappings", b2j_map.len());
+
+        println!(
+            "cargo:warning=Generated {} Bedrock->Java mappings",
+            b2j_map.len()
+        );
     } else {
-        writeln!(file, "pub static BEDROCK_B2J_MAP: phf::Map<&'static str, &'static str> = phf_map! {{}};")?;
+        writeln!(
+            file,
+            "pub static BEDROCK_B2J_MAP: phf::Map<&'static str, &'static str> = phf_map! {{}};"
+        )?;
         println!("cargo:warning=bedrock_blocks_b2j.json not found, using empty mapping");
     }
-    
+
     Ok(())
 }
 
@@ -2027,13 +2057,13 @@ fn normalize_blockstate_string(blockstate: &str) -> String {
     if let Some(bracket_pos) = blockstate.find('[') {
         let block_id = &blockstate[..bracket_pos];
         let props_str = &blockstate[bracket_pos + 1..];
-        
+
         if props_str.ends_with(']') {
             let props_str = &props_str[..props_str.len() - 1];
             if props_str.is_empty() {
                 return format!("{}[]", block_id);
             }
-            
+
             let mut props: Vec<&str> = props_str.split(',').collect();
             props.sort();
             format!("{}[{}]", block_id, props.join(","))

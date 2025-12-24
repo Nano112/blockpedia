@@ -1,4 +1,4 @@
-use crate::{BlockState, Result, BLOCKS, BlockpediaError};
+use crate::{BlockState, BlockpediaError, Result, BLOCKS};
 use std::collections::HashMap;
 
 /// Block transformation operations for rotation, material variants, and shape modifications
@@ -97,7 +97,10 @@ impl Direction {
             Rotation::None => self,
             Rotation::Clockwise90 => self.rotate_clockwise(),
             Rotation::Half => self.rotate_clockwise().rotate_clockwise(),
-            Rotation::Clockwise270 => self.rotate_clockwise().rotate_clockwise().rotate_clockwise(),
+            Rotation::Clockwise270 => self
+                .rotate_clockwise()
+                .rotate_clockwise()
+                .rotate_clockwise(),
         }
     }
 
@@ -123,7 +126,7 @@ impl BlockTransforms {
 
         let block_id = block_state.to_string();
         let (base_id, properties) = Self::parse_block_state(&block_id)?;
-        
+
         let mut new_properties = properties.clone();
 
         // Handle directional properties
@@ -161,15 +164,15 @@ impl BlockTransforms {
 
     /// Get material variant of a block (e.g., oak_stairs -> stone_stairs)
     pub fn get_material_variant(
-        block_state: &BlockState, 
-        target_material: &str
+        block_state: &BlockState,
+        target_material: &str,
     ) -> Result<BlockState> {
         let block_id = block_state.to_string();
         let (base_id, properties) = Self::parse_block_state(&block_id)?;
-        
+
         // Extract the shape/type from the block ID
         let shape = Self::extract_block_shape(&base_id)?;
-        
+
         // Build new block ID with target material
         let new_base_id = match shape {
             BlockShape::Full => format!("minecraft:{}", target_material),
@@ -215,14 +218,14 @@ impl BlockTransforms {
     /// Get shape variant of a block (e.g., stone -> stone_stairs)
     pub fn get_shape_variant(
         block_state: &BlockState,
-        target_shape: BlockShape
+        target_shape: BlockShape,
     ) -> Result<BlockState> {
         let block_id = block_state.to_string();
         let (base_id, properties) = Self::parse_block_state(&block_id)?;
-        
+
         // Extract the material from the block ID
         let material = Self::extract_material(&base_id)?;
-        
+
         // Build new block ID with target shape
         let new_base_id = match target_shape {
             BlockShape::Full => format!("minecraft:{}", material),
@@ -296,7 +299,7 @@ impl BlockTransforms {
     pub fn find_material_variants(block_state: &BlockState) -> Result<Vec<String>> {
         let block_id = block_state.to_string();
         let (base_id, _) = Self::parse_block_state(&block_id)?;
-        
+
         let shape = Self::extract_block_shape(&base_id)?;
         let mut variants = Vec::new();
 
@@ -320,7 +323,7 @@ impl BlockTransforms {
     pub fn find_shape_variants(block_state: &BlockState) -> Result<Vec<BlockShape>> {
         let block_id = block_state.to_string();
         let (base_id, _) = Self::parse_block_state(&block_id)?;
-        
+
         let material = Self::extract_material(&base_id)?;
         let mut variants = Vec::new();
 
@@ -346,14 +349,17 @@ impl BlockTransforms {
         if let Some(bracket_pos) = block_id.find('[') {
             let base_id = block_id[..bracket_pos].to_string();
             let properties_str = &block_id[bracket_pos + 1..];
-            
+
             if !properties_str.ends_with(']') {
-                return Err(BlockpediaError::parse_failed(block_id, "missing closing bracket"));
+                return Err(BlockpediaError::parse_failed(
+                    block_id,
+                    "missing closing bracket",
+                ));
             }
-            
+
             let properties_str = &properties_str[..properties_str.len() - 1];
             let mut properties = HashMap::new();
-            
+
             if !properties_str.is_empty() {
                 for prop_pair in properties_str.split(',') {
                     let parts: Vec<&str> = prop_pair.split('=').collect();
@@ -362,26 +368,29 @@ impl BlockTransforms {
                     }
                 }
             }
-            
+
             Ok((base_id, properties))
         } else {
             Ok((block_id.to_string(), HashMap::new()))
         }
     }
 
-    fn build_block_state(base_id: &str, properties: &HashMap<String, String>) -> Result<BlockState> {
+    fn build_block_state(
+        base_id: &str,
+        properties: &HashMap<String, String>,
+    ) -> Result<BlockState> {
         let mut state = BlockState::new(base_id)?;
-        
+
         for (key, value) in properties {
             state = state.with(key, value)?;
         }
-        
+
         Ok(state)
     }
 
     fn extract_block_shape(block_id: &str) -> Result<BlockShape> {
         let id = block_id.strip_prefix("minecraft:").unwrap_or(block_id);
-        
+
         if id.ends_with("_stairs") {
             Ok(BlockShape::Stairs)
         } else if id.ends_with("_slab") {
@@ -407,7 +416,7 @@ impl BlockTransforms {
 
     fn extract_material(block_id: &str) -> Result<String> {
         let id = block_id.strip_prefix("minecraft:").unwrap_or(block_id);
-        
+
         // Remove common suffixes to get the base material
         let material = if id.ends_with("_stairs") {
             id.strip_suffix("_stairs").unwrap()

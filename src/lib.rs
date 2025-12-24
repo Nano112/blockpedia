@@ -266,27 +266,27 @@ impl BlockState {
         let facts = BLOCKS
             .get(&self.block_id)
             .ok_or_else(|| BlockpediaError::block_not_found(&self.block_id))?;
-        
+
         // Build a complete blockstate with all properties (including defaults)
         let mut complete_properties = HashMap::new();
-        
+
         // First, add all default properties from default_state
         for (name, value) in facts.default_state {
             complete_properties.insert(name.to_string(), value.to_string());
         }
-        
+
         // For any properties that don't have defaults, use the first allowed value
         for (name, values) in facts.properties {
             if !complete_properties.contains_key(*name) && !values.is_empty() {
                 complete_properties.insert(name.to_string(), values[0].to_string());
             }
         }
-        
+
         // Then, override with any explicitly set properties
         for (name, value) in &self.properties {
             complete_properties.insert(name.clone(), value.clone());
         }
-        
+
         // Build the Java blockstate string with all properties
         let mut props = Vec::new();
         for (key, value) in &complete_properties {
@@ -298,16 +298,17 @@ impl BlockState {
         } else {
             format!("{}[{}]", self.block_id, props.join(","))
         };
-        
+
         // Look up the Bedrock blockstate string in the mapping
-        let bedrock_blockstate = bedrock_mapping::BedrockBlockStateMapper::java_to_bedrock(&java_blockstate)
-            .ok_or_else(|| {
-                BlockpediaError::custom(format!(
-                    "No Bedrock mapping found for Java blockstate: {}",
-                    java_blockstate
-                ))
-            })?;
-        
+        let bedrock_blockstate =
+            bedrock_mapping::BedrockBlockStateMapper::java_to_bedrock(&java_blockstate)
+                .ok_or_else(|| {
+                    BlockpediaError::custom(format!(
+                        "No Bedrock mapping found for Java blockstate: {}",
+                        java_blockstate
+                    ))
+                })?;
+
         // Parse the Bedrock blockstate string (without validation since it's Bedrock format)
         Self::parse_unvalidated(bedrock_blockstate)
     }
@@ -325,16 +326,17 @@ impl BlockState {
         } else {
             format!("{}[{}]", bedrock_id, props.join(","))
         };
-        
+
         // Look up the Java blockstate string in the mapping
-        let java_blockstate = bedrock_mapping::BedrockBlockStateMapper::bedrock_to_java(&bedrock_blockstate)
-            .ok_or_else(|| {
-                BlockpediaError::custom(format!(
-                    "No Java mapping found for Bedrock blockstate: {}",
-                    bedrock_blockstate
-                ))
-            })?;
-        
+        let java_blockstate =
+            bedrock_mapping::BedrockBlockStateMapper::bedrock_to_java(&bedrock_blockstate)
+                .ok_or_else(|| {
+                    BlockpediaError::custom(format!(
+                        "No Java mapping found for Bedrock blockstate: {}",
+                        bedrock_blockstate
+                    ))
+                })?;
+
         // Parse the Java blockstate string (with validation since it's Java format)
         BlockState::parse(java_blockstate)
     }
@@ -389,9 +391,7 @@ pub use query_builder::{
 
 // Block transformation module for rotation and variants
 pub mod transforms;
-pub use transforms::{
-    BlockTransforms, Direction, Rotation, BlockShape,
-};
+pub use transforms::{BlockShape, BlockTransforms, Direction, Rotation};
 
 /// Get a block by its string ID
 pub fn get_block(id: &str) -> Option<&'static BlockFacts> {
