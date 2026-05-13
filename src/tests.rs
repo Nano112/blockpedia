@@ -731,4 +731,234 @@ mod bedrock_translation_tests {
             }
         }
     }
+
+    // ────────────────────────────────────────────────────────────────────
+    // Redstone-relevant Java→Bedrock translations (BP-1 batch)
+    // Added after a community report showed hoppers/pistons/repeaters
+    // losing orientation on `.mcstructure` export.
+    // ────────────────────────────────────────────────────────────────────
+
+    /// Helper: build a Java state with a list of (k, v) properties.
+    fn java_state(id: &str, props: &[(&str, &str)]) -> Option<BlockState> {
+        let facts = BLOCKS.get(id)?;
+        if facts.extras.bedrock.is_none() {
+            return None;
+        }
+        let mut s = BlockState::from_default(facts).ok()?;
+        for (k, v) in props {
+            s = s.with(k, v).ok()?;
+        }
+        Some(s)
+    }
+
+    #[test]
+    fn hopper_java_to_bedrock_facing_north() {
+        if let Some(j) = java_state("minecraft:hopper", &[("facing", "north")]) {
+            let b = j.to_bedrock().unwrap();
+            assert_eq!(b.id(), "minecraft:hopper");
+            // Bedrock facing_direction: 0=down, 1=up, 2=north, 3=south, 4=west, 5=east
+            assert_eq!(
+                b.get_property("facing_direction"),
+                Some("2"),
+                "hopper north -> facing_direction=2; got {:?}",
+                b.properties()
+            );
+        }
+    }
+
+    #[test]
+    fn hopper_java_to_bedrock_all_facings() {
+        // Map of Java facing → expected Bedrock facing_direction
+        let cases = &[
+            ("down", "0"),
+            ("north", "2"),
+            ("south", "3"),
+            ("west", "4"),
+            ("east", "5"),
+        ];
+        for (java_facing, expected_dir) in cases {
+            if let Some(j) = java_state("minecraft:hopper", &[("facing", java_facing)]) {
+                let b = j.to_bedrock().unwrap();
+                assert_eq!(
+                    b.get_property("facing_direction"),
+                    Some(*expected_dir),
+                    "hopper facing={} -> expected facing_direction={}, got {:?}",
+                    java_facing,
+                    expected_dir,
+                    b.properties()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn sticky_piston_java_to_bedrock_facings() {
+        // Piston facing_direction in Bedrock is INVERTED on the horizontal
+        // plane relative to other blocks. This matches Geyser's mapping —
+        // Bedrock semantics is "direction the back of the piston faces"
+        // while Java is "direction the head faces". So Java north ↔
+        // Bedrock 3 (south), east ↔ 4 (east no change because of east/west
+        // mirror), etc.
+        let cases = &[
+            ("down", "0"),
+            ("up", "1"),
+            ("north", "3"),
+            ("south", "2"),
+            ("west", "5"),
+            ("east", "4"),
+        ];
+        for (java_facing, expected_dir) in cases {
+            if let Some(j) = java_state(
+                "minecraft:sticky_piston",
+                &[("facing", java_facing), ("extended", "false")],
+            ) {
+                let b = j.to_bedrock().unwrap();
+                assert!(
+                    b.id().contains("sticky_piston"),
+                    "expected sticky_piston id, got '{}'",
+                    b.id()
+                );
+                assert_eq!(
+                    b.get_property("facing_direction"),
+                    Some(*expected_dir),
+                    "sticky_piston facing={} -> expected facing_direction={}, got {:?}",
+                    java_facing,
+                    expected_dir,
+                    b.properties()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn observer_java_to_bedrock_facing_and_powered() {
+        if let Some(j) = java_state(
+            "minecraft:observer",
+            &[("facing", "east"), ("powered", "true")],
+        ) {
+            let b = j.to_bedrock().unwrap();
+            // Observer in Bedrock uses the namespaced `minecraft:facing_direction`
+            // STRING property (not the `facing_direction` integer used by hoppers).
+            // Geyser carries Java facing values through unchanged.
+            assert!(b.id().contains("observer"), "got id={}", b.id());
+            assert_eq!(
+                b.get_property("minecraft:facing_direction"),
+                Some("east"),
+                "observer facing=east -> minecraft:facing_direction=east, got {:?}",
+                b.properties()
+            );
+            assert_eq!(
+                b.get_property("powered_bit"),
+                Some("true"),
+                "observer powered=true -> powered_bit=true, got {:?}",
+                b.properties()
+            );
+        }
+    }
+
+    #[test]
+    fn comparator_java_to_bedrock_mode_and_facing() {
+        if let Some(j) = java_state(
+            "minecraft:comparator",
+            &[
+                ("facing", "north"),
+                ("mode", "subtract"),
+                ("powered", "true"),
+            ],
+        ) {
+            let b = j.to_bedrock().unwrap();
+            // Bedrock comparator splits into `unpowered_comparator` and
+            // `powered_comparator` by powered state.
+            assert!(
+                b.id().contains("comparator"),
+                "expected comparator id, got '{}'",
+                b.id()
+            );
+            // Java "subtract" -> Bedrock output_subtract_bit=true
+            assert_eq!(
+                b.get_property("output_subtract_bit"),
+                Some("true"),
+                "comparator mode=subtract -> output_subtract_bit=true, got {:?}",
+                b.properties()
+            );
+        }
+    }
+
+    #[test]
+    fn lever_java_to_bedrock_face_wall() {
+        if let Some(j) = java_state(
+            "minecraft:lever",
+            &[("face", "wall"), ("facing", "east"), ("powered", "true")],
+        ) {
+            let b = j.to_bedrock().unwrap();
+            assert_eq!(b.id(), "minecraft:lever");
+            // Bedrock `open_bit` mirrors Java `powered`.
+            assert_eq!(
+                b.get_property("open_bit"),
+                Some("true"),
+                "lever powered=true -> open_bit=true, got {:?}",
+                b.properties()
+            );
+        }
+    }
+
+    #[test]
+    fn furnace_java_to_bedrock_facing_and_lit() {
+        if let Some(j) = java_state(
+            "minecraft:furnace",
+            &[("facing", "south"), ("lit", "true")],
+        ) {
+            let b = j.to_bedrock().unwrap();
+            // Bedrock furnace splits into `lit_furnace` / `furnace` by lit state
+            // and uses the namespaced string `minecraft:cardinal_direction`
+            // property (not facing_direction).
+            assert!(b.id().contains("furnace"), "got id={}", b.id());
+            assert_eq!(
+                b.get_property("minecraft:cardinal_direction"),
+                Some("south"),
+                "furnace facing=south -> minecraft:cardinal_direction=south, got {:?}",
+                b.properties()
+            );
+        }
+    }
+
+    #[test]
+    fn dispenser_java_to_bedrock_facing_and_triggered() {
+        if let Some(j) = java_state(
+            "minecraft:dispenser",
+            &[("facing", "down"), ("triggered", "true")],
+        ) {
+            let b = j.to_bedrock().unwrap();
+            assert_eq!(b.id(), "minecraft:dispenser");
+            assert_eq!(
+                b.get_property("facing_direction"),
+                Some("0"),
+                "dispenser facing=down -> facing_direction=0, got {:?}",
+                b.properties()
+            );
+            assert_eq!(
+                b.get_property("triggered_bit"),
+                Some("true"),
+                "dispenser triggered=true -> triggered_bit=true, got {:?}",
+                b.properties()
+            );
+        }
+    }
+
+    #[test]
+    fn dropper_java_to_bedrock_facing() {
+        if let Some(j) = java_state(
+            "minecraft:dropper",
+            &[("facing", "up"), ("triggered", "false")],
+        ) {
+            let b = j.to_bedrock().unwrap();
+            assert_eq!(b.id(), "minecraft:dropper");
+            assert_eq!(
+                b.get_property("facing_direction"),
+                Some("1"),
+                "dropper facing=up -> facing_direction=1, got {:?}",
+                b.properties()
+            );
+        }
+    }
 }
