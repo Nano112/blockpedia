@@ -203,7 +203,7 @@ mod milestone6_tests {
         assert!(stone.extras.color.is_some());
         let color = stone.extras.color.unwrap();
         assert_eq!(color.rgb, [125, 125, 125]);
-        assert!((color.oklab[0] - 0.49).abs() < 0.01); // Calculated L value for RGB [125, 125, 125]
+        assert!((color.oklab[0] - 0.5897123).abs() < 0.00003);
     }
 
     #[test]

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use image::{DynamicImage, Rgba};
-use palette::{IntoColor, Lab, Oklch, Srgb};
+use palette::{IntoColor, Lab, Oklab, Oklch, Srgb};
 use std::path::Path;
 
 pub mod block_palettes;
@@ -36,8 +36,9 @@ impl ExtendedColorData {
         // Simple HSL conversion
         let hsl = rgb_to_hsl(r, g, b);
 
-        // Simple Oklab conversion (matching existing code)
-        let oklab = rgb_to_oklab_simple(rgb);
+        // Decode the sRGB transfer function before the perceptual transform.
+        let converted: Oklab = srgb.into_color();
+        let oklab = [converted.l, converted.a, converted.b];
 
         // Convert to Lab values
         let lab_values = [lab.l, lab.a, lab.b];
@@ -160,15 +161,4 @@ fn rgb_to_hsl(r: u8, g: u8, b: u8) -> [f32; 3] {
     };
 
     [h * 360.0, s, l]
-}
-
-/// Simple RGB to Oklab conversion (matching existing build script)
-fn rgb_to_oklab_simple(rgb: [u8; 3]) -> [f32; 3] {
-    let r = rgb[0] as f32 / 255.0;
-    let g = rgb[1] as f32 / 255.0;
-    let b = rgb[2] as f32 / 255.0;
-    let l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    let a = (r - g) * 0.5;
-    let b_val = (r + g - 2.0 * b) * 0.25;
-    [l, a, b_val]
 }
