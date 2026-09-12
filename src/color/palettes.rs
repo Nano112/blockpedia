@@ -1,4 +1,5 @@
 use super::ExtendedColorData;
+use palette::{IntoColor, Oklab, Srgb};
 
 /// Generate color palettes from block collections
 pub struct PaletteGenerator;
@@ -215,21 +216,10 @@ fn hsl_to_rgb(h: f32, s: f32, l: f32) -> [u8; 3] {
     ]
 }
 
-/// Helper function to convert Oklab to RGB (simplified)
-#[allow(clippy::manual_clamp, clippy::excessive_precision)] // Scientific precision required for color conversion
+/// Convert a perceptual interpolation back to gamma-encoded sRGB, clipping out-of-gamut values.
 fn oklab_to_rgb(oklab: [f32; 3]) -> [u8; 3] {
-    // Simplified Oklab to RGB conversion
-    // In a production system, you'd want to use a proper color space library
-    let l = oklab[0].clamp(0.0, 1.0);
-    let a = oklab[1];
-    let b = oklab[2];
-
-    // Approximate conversion (this is simplified)
-    let r = (l + 0.3963377774 * a + 0.2158037573 * b).max(0.0).min(1.0);
-    let g = (l - 0.1055613458 * a - 0.0638541728 * b).max(0.0).min(1.0);
-    let b_val = (l - 0.0894841775 * a - 1.2914855480 * b).max(0.0).min(1.0);
-
-    [(r * 255.0) as u8, (g * 255.0) as u8, (b_val * 255.0) as u8]
+    let rgb: Srgb = Oklab::new(oklab[0], oklab[1], oklab[2]).into_color();
+    [rgb.red, rgb.green, rgb.blue].map(|c| (c.clamp(0.0, 1.0) * 255.0).round() as u8)
 }
 
 impl PaletteGenerator {

@@ -715,13 +715,9 @@ impl FetcherRegistry {
     }
 
     fn add_color_data(&mut self, block_id: &str, rgb: (u8, u8, u8)) {
-        // Use the same RGB to Oklab conversion as the generated code
-        let r = rgb.0 as f32 / 255.0;
-        let g = rgb.1 as f32 / 255.0;
-        let b = rgb.2 as f32 / 255.0;
-        let l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        let a = (r - g) * 0.5;
-        let b_val = (r + g - 2.0 * b) * 0.25;
+        let srgb = palette::Srgb::new(rgb.0 as f32 / 255.0, rgb.1 as f32 / 255.0, rgb.2 as f32 / 255.0);
+        let converted: palette::Oklab = palette::IntoColor::into_color(srgb);
+        let (l, a, b_val) = (converted.l, converted.a, converted.b);
 
         self.extra_data
             .color_data
@@ -740,7 +736,11 @@ impl FetcherRegistry {
                 println!("cargo:warning=Textures not found, but color cache exists. Loading from {cache_path:?}");
                 let cache_data = fs::read_to_string(&cache_path)?;
                 let cache: HashMap<String, (u8, u8, u8, f32, f32, f32)> = serde_json::from_str(&cache_data)?;
-                self.extra_data.color_data.extend(cache);
+                // Older caches store a luminance approximation in their last three fields.
+                // RGB is authoritative; recompute instead of mixing incompatible color spaces.
+                for (id, (r, g, b, _, _, _)) in cache {
+                    self.add_color_data(&id, (r, g, b));
+                }
                 println!("cargo:warning=Loaded {} colors from cache", self.extra_data.color_data.len());
                 return Ok(());
             }
@@ -1301,17 +1301,7 @@ impl FetcherRegistry {
 
         // Helper functions
         writeln!(file, "fn rgb_to_oklab(rgb: [u8; 3]) -> [f32; 3] {{")?;
-        writeln!(
-            file,
-            "    // Simplified RGB to Oklab conversion for build-time"
-        )?;
-        writeln!(file, "    let r = rgb[0] as f32 / 255.0;")?;
-        writeln!(file, "    let g = rgb[1] as f32 / 255.0;")?;
-        writeln!(file, "    let b = rgb[2] as f32 / 255.0;")?;
-        writeln!(file, "    let l = 0.2126 * r + 0.7152 * g + 0.0722 * b;")?;
-        writeln!(file, "    let a = (r - g) * 0.5;")?;
-        writeln!(file, "    let b_val = (r + g - 2.0 * b) * 0.25;")?;
-        writeln!(file, "    [l, a, b_val]")?;
+        writeln!(file, "    crate::color::ExtendedColorData::from_rgb(rgb[0], rgb[1], rgb[2]).oklab")?;
         writeln!(file, "}}")?;
         writeln!(file)?;
 
@@ -1761,24 +1751,8 @@ fn generate_phf_table(
         }
 
         // Color data
-        if let Some((r, g, b, l, a, b_val)) = extra_data.color_data.get(block_id) {
-            // Adjust values to avoid clippy::approx_constant warnings
-            let adjusted_l = if (*l - std::f32::consts::FRAC_1_PI).abs() < 0.001 {
-                *l + 0.001
-            } else {
-                *l
-            };
-            let adjusted_a = if (*a - std::f32::consts::FRAC_1_PI).abs() < 0.001 {
-                *a + 0.001
-            } else {
-                *a
-            };
-            let adjusted_b = if (*b_val - std::f32::consts::FRAC_1_PI).abs() < 0.001 {
-                *b_val + 0.001
-            } else {
-                *b_val
-            };
-            write!(file, " color: Some(crate::ColorData {{ rgb: [{}, {}, {}], oklab: [{:.3}, {:.3}, {:.3}] }}),", r, g, b, adjusted_l, adjusted_a, adjusted_b)?;
+        if let Some((r, g, b, lightness, green_red, blue_yellow)) = extra_data.color_data.get(block_id) {
+            write!(file, " color: Some(crate::ColorData {{ rgb: [{}, {}, {}], oklab: [{:?}, {:?}, {:?}] }}),", r, g, b, lightness, green_red, blue_yellow)?;
         } else {
             write!(file, " color: None,")?;
         }
@@ -1897,24 +1871,8 @@ fn generate_unified_phf_table(out_dir: &str, unified_blocks: &[UnifiedBlockData]
         }
 
         // Color data
-        if let Some((r, g, b, l, a, b_val)) = extra_data.color_data.get(block_id) {
-            // Adjust values to avoid clippy::approx_constant warnings
-            let adjusted_l = if (*l - std::f32::consts::FRAC_1_PI).abs() < 0.001 {
-                *l + 0.001
-            } else {
-                *l
-            };
-            let adjusted_a = if (*a - std::f32::consts::FRAC_1_PI).abs() < 0.001 {
-                *a + 0.001
-            } else {
-                *a
-            };
-            let adjusted_b = if (*b_val - std::f32::consts::FRAC_1_PI).abs() < 0.001 {
-                *b_val + 0.001
-            } else {
-                *b_val
-            };
-            write!(file, " color: Some(crate::ColorData {{ rgb: [{}, {}, {}], oklab: [{:.3}, {:.3}, {:.3}] }}),", r, g, b, adjusted_l, adjusted_a, adjusted_b)?;
+        if let Some((r, g, b, lightness, green_red, blue_yellow)) = extra_data.color_data.get(block_id) {
+            write!(file, " color: Some(crate::ColorData {{ rgb: [{}, {}, {}], oklab: [{:?}, {:?}, {:?}] }}),", r, g, b, lightness, green_red, blue_yellow)?;
         } else {
             write!(file, " color: None,")?;
         }
